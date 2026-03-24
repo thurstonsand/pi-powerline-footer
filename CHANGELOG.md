@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+### Changed
+- **Nested `powerline` config is now first-class** — Settings can now be organized under `powerline` as an object, including `preset`, `showLastPrompt`, `shortcuts`, `profiles`, and `vibe`. The legacy top-level keys still load as fallback, but the nested shape is now the preferred configuration model.
+- **Settings writes now preserve nested config** — Commands like `/powerline`, `/vibe`, and `/model-switcher` now update the nested `powerline` object instead of flattening or overwriting adjacent config.
+
+### Added
+- **Migration docs for nested settings** — README now includes before/after migration guidance for moving older top-level settings into the new nested `powerline` object.
+
 ## [0.4.8] - 2026-03-27
 
 ### Fixed

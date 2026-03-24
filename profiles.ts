@@ -1,6 +1,12 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
-import { homedir } from "node:os";
+import {
+  LEGACY_POWERLINE_PROFILE_KEY,
+  isRecord,
+  normalizePowerlineSettings,
+  persistSettings,
+  readSettings,
+  readSettingsForWrite,
+  updatePowerlineSettings,
+} from "./settings.js";
 
 export type ProfileThinkingLevel = "off" | "minimal" | "low" | "medium" | "high" | "xhigh";
 
@@ -15,72 +21,8 @@ const VALID_THINKING_LEVELS = new Set<ProfileThinkingLevel>(["off", "minimal", "
 let activeProfileIndex: number | null = null;
 let profilesCache: ProfileConfig[] = [];
 
-function getSettingsPath(): string {
-  const homeDir = process.env.HOME || process.env.USERPROFILE || homedir();
-  return join(homeDir, ".pi", "agent", "settings.json");
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
 export function isThinkingLevel(value: unknown): value is ProfileThinkingLevel {
   return typeof value === "string" && VALID_THINKING_LEVELS.has(value as ProfileThinkingLevel);
-}
-
-function readSettingsForLoad(): Record<string, unknown> {
-  const settingsPath = getSettingsPath();
-
-  try {
-    if (!existsSync(settingsPath)) {
-      return {};
-    }
-
-    const parsed = JSON.parse(readFileSync(settingsPath, "utf-8"));
-    if (!isRecord(parsed)) {
-      console.debug(`[powerline-footer] Ignoring non-object settings at ${settingsPath}`);
-      return {};
-    }
-
-    return parsed;
-  } catch (error) {
-    console.debug(`[powerline-footer] Failed to load settings from ${settingsPath}:`, error);
-    return {};
-  }
-}
-
-function readSettingsForWrite(): Record<string, unknown> | null {
-  const settingsPath = getSettingsPath();
-
-  if (!existsSync(settingsPath)) {
-    return {};
-  }
-
-  try {
-    const parsed = JSON.parse(readFileSync(settingsPath, "utf-8"));
-    if (!isRecord(parsed)) {
-      console.debug(`[powerline-footer] Refusing to write modelProfiles: settings at ${settingsPath} is not an object`);
-      return null;
-    }
-
-    return parsed;
-  } catch (error) {
-    console.debug(`[powerline-footer] Failed to parse settings while writing modelProfiles at ${settingsPath}:`, error);
-    return null;
-  }
-}
-
-function persistSettings(settings: Record<string, unknown>): boolean {
-  const settingsPath = getSettingsPath();
-
-  try {
-    mkdirSync(dirname(settingsPath), { recursive: true });
-    writeFileSync(settingsPath, JSON.stringify(settings, null, 2) + "\n");
-    return true;
-  } catch (error) {
-    console.debug(`[powerline-footer] Failed to persist modelProfiles to ${settingsPath}:`, error);
-    return false;
-  }
 }
 
 function normalizeProfile(value: unknown): ProfileConfig | null {
@@ -94,13 +36,8 @@ function normalizeProfile(value: unknown): ProfileConfig | null {
     return null;
   }
 
-  const normalizedModel = model.trim();
-  if (!parseModelSpec(normalizedModel)) {
-    return null;
-  }
-
   const profile: ProfileConfig = {
-    model: normalizedModel,
+    model: model.trim(),
     thinking,
   };
 
@@ -118,8 +55,8 @@ function clampActiveIndex(length: number): void {
 }
 
 export function reloadProfiles(): ProfileConfig[] {
-  const settings = readSettingsForLoad();
-  const stored = settings.modelProfiles;
+  const rawSettings = readSettings("powerline-footer");
+  const stored = normalizePowerlineSettings(rawSettings).profiles;
   if (!Array.isArray(stored)) {
     profilesCache = [];
     activeProfileIndex = null;
@@ -144,14 +81,21 @@ export function getProfilesCache(): ProfileConfig[] {
 }
 
 export function saveProfiles(profiles: ProfileConfig[]): boolean {
-  const settings = readSettingsForWrite();
-  if (!settings) {
+  const rawSettings = readSettingsForWrite("powerline-footer", LEGACY_POWERLINE_PROFILE_KEY);
+  if (!rawSettings) {
     return false;
   }
 
-  settings.modelProfiles = profiles;
+  updatePowerlineSettings(
+    rawSettings,
+    (current) => ({
+      ...current,
+      profiles,
+    }),
+    { deleteLegacyKeys: [LEGACY_POWERLINE_PROFILE_KEY] },
+  );
 
-  const persisted = persistSettings(settings);
+  const persisted = persistSettings(rawSettings, "powerline-footer", LEGACY_POWERLINE_PROFILE_KEY);
   if (!persisted) {
     return false;
   }

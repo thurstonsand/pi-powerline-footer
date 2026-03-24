@@ -52,6 +52,25 @@ Activates automatically. Toggle with `/powerline`, switch presets with `/powerli
 **Environment:** `POWERLINE_NERD_FONTS=1` to force Nerd Fonts, `=0` for ASCII.
 
 Preset selection is saved to `~/.pi/agent/settings.json` under `powerline` and restored on startup.
+Both of these forms are valid:
+
+```json
+{
+  "powerline": "nerd"
+}
+```
+
+```json
+{
+  "powerline": {
+    "preset": "nerd",
+    "showLastPrompt": false
+  }
+}
+```
+
+The object form is now the preferred config shape.
+If you're upgrading from an older config, see **Migrate existing settings** at the end of this README.
 Run `/powerline default` to switch back to the default preset.
 
 ## Editor Stash
@@ -91,12 +110,14 @@ You can override shortcut keys in `~/.pi/agent/settings.json`:
 
 ```json
 {
-  "powerlineShortcuts": {
-    "stashHistory": "ctrl+alt+h",
-    "copyEditor": "ctrl+alt+c",
-    "cutEditor": "ctrl+alt+x",
-    "profileCycle": "alt+shift+tab",
-    "profileSelect": "ctrl+alt+m"
+  "powerline": {
+    "shortcuts": {
+      "stashHistory": "ctrl+alt+h",
+      "copyEditor": "ctrl+alt+c",
+      "cutEditor": "ctrl+alt+x",
+      "profileCycle": "alt+shift+tab",
+      "profileSelect": "ctrl+alt+m"
+    }
   }
 }
 ```
@@ -109,11 +130,13 @@ Model profiles are saved model + thinking combinations stored in `~/.pi/agent/se
 
 ```json
 {
-  "modelProfiles": [
-    { "model": "anthropic/claude-opus-4.6", "thinking": "xhigh", "label": "Opus Deep" },
-    { "model": "openai/codex-5.3", "thinking": "low", "label": "Codex Fast" },
-    { "model": "google/gemini-3-pro", "thinking": "medium" }
-  ]
+  "powerline": {
+    "profiles": [
+      { "model": "anthropic/claude-opus-4.6", "thinking": "xhigh", "label": "Opus Deep" },
+      { "model": "openai/codex-5.3", "thinking": "low", "label": "Codex Fast" },
+      { "model": "google/gemini-3-pro", "thinking": "medium" }
+    ]
+  }
 }
 ```
 
@@ -122,7 +145,7 @@ Model profiles are saved model + thinking combinations stored in `~/.pi/agent/se
 - `alt+shift+tab` — cycle to the next profile
 - `ctrl+alt+m` — open profile selector overlay
 
-Both bindings are configurable via `powerlineShortcuts.profileCycle` and `powerlineShortcuts.profileSelect`.
+Both bindings are configurable via `powerline.shortcuts.profileCycle` and `powerline.shortcuts.profileSelect`.
 
 ### `/model-switcher` command
 
@@ -161,13 +184,17 @@ In `~/.pi/agent/settings.json`:
 
 ```json
 {
-  "workingVibe": "star trek",                              // Theme phrase
-  "workingVibeMode": "generate",                           // "generate" (on-demand) or "file" (pre-generated)
-  "workingVibeModel": "anthropic/claude-haiku-4-5",        // Optional: model to use (default)
-  "workingVibeFallback": "Working",                        // Optional: fallback message
-  "workingVibeRefreshInterval": 30,                        // Optional: seconds between refreshes (default 30)
-  "workingVibePrompt": "Generate a {theme} loading message for: {task}",  // Optional: custom prompt template
-  "workingVibeMaxLength": 65                         // Optional: max message length (default 65)
+  "powerline": {
+    "vibe": {
+      "theme": "star trek",                               // Theme phrase
+      "mode": "generate",                                 // "generate" (on-demand) or "file" (pre-generated)
+      "model": "anthropic/claude-haiku-4-5",              // Optional: model to use (default)
+      "fallback": "Working",                              // Optional: fallback message
+      "refreshInterval": 30,                               // Optional: seconds between refreshes (default 30)
+      "prompt": "Generate a {theme} loading message for: {task}",
+      "maxLength": 65                                      // Optional: max message length (default 65)
+    }
+  }
 }
 ```
 
@@ -276,3 +303,65 @@ Colors can be:
 - **Hex colors**: `#ff5500`, `#d787af`
 
 See `theme.example.json` for all available options.
+
+## Migrate existing settings
+
+If you're moving from the older top-level config style, consolidate those fields under `powerline`.
+
+Before:
+
+```json
+{
+  "powerline": "nerd",
+  "showLastPrompt": false,
+  "powerlineShortcuts": {
+    "stashHistory": "ctrl+alt+h",
+    "copyEditor": "ctrl+alt+c",
+    "cutEditor": "ctrl+alt+x",
+    "profileCycle": "alt+shift+tab",
+    "profileSelect": "ctrl+alt+m"
+  },
+  "modelProfiles": [
+    { "model": "anthropic/claude-opus-4.6", "thinking": "xhigh", "label": "Opus Deep" }
+  ],
+  "workingVibe": "star trek",
+  "workingVibeMode": "generate",
+  "workingVibeModel": "anthropic/claude-haiku-4-5",
+  "workingVibeFallback": "Working",
+  "workingVibeRefreshInterval": 30,
+  "workingVibePrompt": "Generate a {theme} loading message for: {task}",
+  "workingVibeMaxLength": 65
+}
+```
+
+After:
+
+```json
+{
+  "powerline": {
+    "preset": "nerd",
+    "showLastPrompt": false,
+    "shortcuts": {
+      "stashHistory": "ctrl+alt+h",
+      "copyEditor": "ctrl+alt+c",
+      "cutEditor": "ctrl+alt+x",
+      "profileCycle": "alt+shift+tab",
+      "profileSelect": "ctrl+alt+m"
+    },
+    "profiles": [
+      { "model": "anthropic/claude-opus-4.6", "thinking": "xhigh", "label": "Opus Deep" }
+    ],
+    "vibe": {
+      "theme": "star trek",
+      "mode": "generate",
+      "model": "anthropic/claude-haiku-4-5",
+      "fallback": "Working",
+      "refreshInterval": 30,
+      "prompt": "Generate a {theme} loading message for: {task}",
+      "maxLength": 65
+    }
+  }
+}
+```
+
+For now, the old keys still load, but new docs and examples use the nested `powerline` shape.
