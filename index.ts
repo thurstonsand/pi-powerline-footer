@@ -1,17 +1,30 @@
 import {
   copyToClipboard,
+  getAgentDir,
   type ExtensionAPI,
   type ReadonlyFooterDataProvider,
   type Theme,
 } from "@mariozechner/pi-coding-agent";
 import type { AssistantMessage } from "@mariozechner/pi-ai";
-import { type SelectItem, SelectList, truncateToWidth, visibleWidth, Input, fuzzyFilter } from "@mariozechner/pi-tui";
+import { type KeyId, type SelectItem, SelectList, truncateToWidth, visibleWidth, Input, fuzzyFilter } from "@mariozechner/pi-tui";
 import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync } from "node:fs";
 import { join, dirname } from "node:path";
-import { homedir } from "node:os";
 
-import type { ColorScheme, SegmentContext, StatusLinePreset, StatusLineSegmentId } from "./types.js";
+import type {
+  ColorScheme,
+  PowerlineSettings,
+  SegmentContext,
+  StatusLinePreset,
+  StatusLineSegmentId,
+} from "./types.js";
 import { getPreset, PRESETS } from "./presets.js";
+import {
+  migrateLegacyPowerlineSettingsFile,
+  patchPowerlineSetting,
+  readPowerlineSettings,
+  normalizePreset,
+  readSettings,
+} from "./settings.js";
 import { getSeparator } from "./separators.js";
 import { renderSegment } from "./segments.js";
 import { getGitStatus, invalidateGitStatus, invalidateGitBranch } from "./git-status.js";
@@ -60,11 +73,11 @@ let config: PowerlineConfig = {
 };
 
 interface PowerlineShortcuts {
-  stashHistory: string;
-  copyEditor: string;
-  cutEditor: string;
-  profileCycle: string;
-  profileSelect: string;
+  stashHistory: KeyId;
+  copyEditor: KeyId;
+  cutEditor: KeyId;
+  profileCycle: KeyId;
+  profileSelect: KeyId;
 }
 
 type PowerlineShortcutKey = keyof PowerlineShortcuts;
@@ -151,31 +164,12 @@ function trackPromptHistory(editor: any): void {
   snapshotPromptHistory(editor);
 }
 
-function getSettingsPath(): string {
-  const homeDir = process.env.HOME || process.env.USERPROFILE || homedir();
-  return join(homeDir, ".pi", "agent", "settings.json");
-}
-
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function getStashHistoryPath(): string {
-  const homeDir = process.env.HOME || process.env.USERPROFILE || homedir();
-  return join(homeDir, ".pi", "agent", "powerline-footer", "stash-history.json");
-}
-
-function getSessionsPath(): string {
-  const homeDir = process.env.HOME || process.env.USERPROFILE || homedir();
-  return join(homeDir, ".pi", "agent", "sessions");
-}
-
-function getProjectSessionsPath(cwd: string): string {
-  const projectKey = cwd
-    .replace(/^[/\\]+|[/\\]+$/g, "")
-    .replace(/[\\/]+/g, "-");
-
-  return join(getSessionsPath(), `--${projectKey}--`);
+  return join(getAgentDir(), "powerline-footer", "stash-history.json");
 }
 
 function getPromptHistoryText(content: unknown): string {
@@ -198,18 +192,17 @@ function getPromptHistoryText(content: unknown): string {
   return parts.join("\n").replace(/\s+/g, " ").trim();
 }
 
-function readRecentProjectPrompts(cwd: string, limit: number): string[] {
-  const sessionsPath = getProjectSessionsPath(cwd);
-  if (!existsSync(sessionsPath)) {
+function readRecentProjectPrompts(sessionDir: string, limit: number): string[] {
+  if (!existsSync(sessionDir)) {
     return [];
   }
 
   const promptEntries: { text: string; timestamp: number }[] = [];
-  const fileNames = readdirSync(sessionsPath)
+  const fileNames = readdirSync(sessionDir)
     .filter((fileName) => fileName.endsWith(".jsonl"));
 
   for (const fileName of fileNames) {
-    const filePath = join(sessionsPath, fileName);
+    const filePath = join(sessionDir, fileName);
     const lines = readFileSync(filePath, "utf-8").split("\n");
 
     for (let i = lines.length - 1; i >= 0; i--) {
@@ -328,66 +321,8 @@ function persistStashHistory(history: string[]): void {
   }
 }
 
-function readSettings(): Record<string, unknown> {
-  const settingsPath = getSettingsPath();
-  try {
-    if (!existsSync(settingsPath)) {
-      return {};
-    }
-
-    const parsed = JSON.parse(readFileSync(settingsPath, "utf-8"));
-    if (!isRecord(parsed)) {
-      console.debug(`[powerline-footer] Ignoring non-object settings at ${settingsPath}`);
-      return {};
-    }
-    return parsed;
-  } catch (error) {
-    console.debug(`[powerline-footer] Failed to read settings from ${settingsPath}:`, error);
-    return {};
-  }
-}
-
 function writePowerlinePresetSetting(preset: StatusLinePreset): boolean {
-  const settingsPath = getSettingsPath();
-  let settings: Record<string, unknown> = {};
-
-  if (existsSync(settingsPath)) {
-    try {
-      const parsed = JSON.parse(readFileSync(settingsPath, "utf-8"));
-      if (!isRecord(parsed)) {
-        console.debug(`[powerline-footer] Refusing to write preset to non-object settings at ${settingsPath}`);
-        return false;
-      }
-      settings = parsed;
-    } catch (error) {
-      console.debug(`[powerline-footer] Failed to parse settings at ${settingsPath}:`, error);
-      return false;
-    }
-  }
-
-  settings.powerline = preset;
-
-  try {
-    mkdirSync(dirname(settingsPath), { recursive: true });
-    writeFileSync(settingsPath, JSON.stringify(settings, null, 2) + "\n");
-    return true;
-  } catch (error) {
-    console.debug(`[powerline-footer] Failed to persist preset to ${settingsPath}:`, error);
-    return false;
-  }
-}
-
-function isValidPreset(value: unknown): value is StatusLinePreset {
-  return typeof value === "string" && Object.prototype.hasOwnProperty.call(PRESETS, value);
-}
-
-function normalizePreset(value: unknown): StatusLinePreset | null {
-  if (typeof value !== "string") {
-    return null;
-  }
-
-  const preset = value.trim().toLowerCase();
-  return isValidPreset(preset) ? preset : null;
+  return patchPowerlineSetting({ preset }, "powerline-footer", "preset");
 }
 
 function hasNonWhitespaceText(text: string): boolean {
@@ -430,7 +365,7 @@ function isValidShortcutKeyPart(keyPart: string): boolean {
   return SHORTCUT_SYMBOL_KEYS.has(keyPart);
 }
 
-function parseShortcutOverride(value: unknown): string | null {
+function parseShortcutOverride(value: unknown): KeyId | null {
   if (typeof value !== "string") {
     return null;
   }
@@ -462,10 +397,10 @@ function parseShortcutOverride(value: unknown): string | null {
   }
 
   const normalizedKey = SHORTCUT_SYMBOL_KEYS.has(keyPart) ? keyPart : keyPart.toLowerCase();
-  return [...modifierParts, normalizedKey].join("+");
+  return [...modifierParts, normalizedKey].join("+") as KeyId;
 }
 
-function findShortcutReplacement(key: PowerlineShortcutKey, used: Set<string>): string | null {
+function findShortcutReplacement(key: PowerlineShortcutKey, used: Set<string>): KeyId | null {
   const preferred = DEFAULT_SHORTCUTS[key];
   if (!used.has(normalizeShortcut(preferred))) {
     return preferred;
@@ -481,11 +416,11 @@ function findShortcutReplacement(key: PowerlineShortcutKey, used: Set<string>): 
   return null;
 }
 
-function resolveShortcutConfig(settings: Record<string, unknown>): PowerlineShortcuts {
+function resolveShortcutConfig(settings: PowerlineSettings): PowerlineShortcuts {
   const resolved: PowerlineShortcuts = { ...DEFAULT_SHORTCUTS };
-  const shortcutSettings = settings.powerlineShortcuts;
+  const shortcutSettings = settings.shortcuts;
 
-  if (isRecord(shortcutSettings)) {
+  if (shortcutSettings) {
     for (const key of SHORTCUT_KEYS) {
       const override = parseShortcutOverride(shortcutSettings[key]);
       if (override) {
@@ -646,14 +581,14 @@ function computeResponsiveLayout(
 // ═══════════════════════════════════════════════════════════════════════════
 
 export default function powerlineFooter(pi: ExtensionAPI) {
-  const startupSettings = readSettings();
-  const resolvedShortcuts = resolveShortcutConfig(startupSettings);
+  migrateLegacyPowerlineSettingsFile("powerline-footer");
+  const rawSettings = readSettings("powerline-footer");
+  const resolvedShortcuts = resolveShortcutConfig(readPowerlineSettings(rawSettings));
 
   let enabled = true;
   let sessionStartTime = Date.now();
   let currentCtx: any = null;
   let footerDataRef: ReadonlyFooterDataProvider | null = null;
-  let getThinkingLevelFn: (() => string) | null = null;
   let isStreaming = false;
   let tuiRef: any = null; // Store TUI reference for forcing re-renders
   let dismissWelcomeOverlay: (() => void) | null = null; // Callback to dismiss welcome overlay
@@ -688,7 +623,7 @@ export default function powerlineFooter(pi: ExtensionAPI) {
     items: SelectItem[],
     maxVisible: number,
   ): Promise<SelectItem | null> {
-    return ctx.ui.custom<SelectItem | null>(
+    return ctx.ui.custom(
       (tui: any, theme: Theme, _keybindings: any, done: (result: SelectItem | null) => void) => {
         const selectList = new SelectList(items, maxVisible, overlaySelectListTheme(theme));
         const border = (text: string) => theme.fg("dim", text);
@@ -770,9 +705,10 @@ export default function powerlineFooter(pi: ExtensionAPI) {
     isStreaming = false;
     stashedEditorText = null;
 
-    const settings = readSettings();
-    showLastPrompt = settings.showLastPrompt !== false;
-    config.preset = normalizePreset(settings.powerline) ?? "default";
+    const rawSettings = readSettings("powerline-footer");
+    const settings = readPowerlineSettings(rawSettings);
+    showLastPrompt = settings.showLastPrompt ?? true;
+    config.preset = settings.preset ?? "default";
     stashedPromptHistory = readPersistedStashHistory();
 
     getThinkingLevelFn = typeof ctx.getThinkingLevel === "function"
@@ -782,14 +718,14 @@ export default function powerlineFooter(pi: ExtensionAPI) {
     if (ctx.hasUI) {
       ctx.ui.setStatus("stash", undefined);
     }
-    
+
     // Initialize vibe manager (needs modelRegistry from ctx)
     initVibeManager(ctx);
-    
+
     if (enabled && ctx.hasUI) {
       setupCustomEditor(ctx);
       if (event.reason === "startup") {
-        if (settings.quietStartup === true) {
+        if (rawSettings.quietStartup === true) {
           setupWelcomeHeader(ctx);
         } else {
           setupWelcomeOverlay(ctx);
@@ -1034,7 +970,7 @@ export default function powerlineFooter(pi: ExtensionAPI) {
     let projectPrompts: string[] = [];
 
     try {
-      projectPrompts = readRecentProjectPrompts(ctx.cwd, PROJECT_PROMPT_HISTORY_LIMIT);
+      projectPrompts = readRecentProjectPrompts(ctx.sessionManager.getSessionDir(), PROJECT_PROMPT_HISTORY_LIMIT);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       ctx.ui.notify(`Failed to load project prompts: ${message}`, "warning");
@@ -1139,7 +1075,7 @@ export default function powerlineFooter(pi: ExtensionAPI) {
       return entries.map((e) => ({ value: e.key, label: e.name, description: e.provider }));
     }
 
-    return ctx.ui.custom<{ provider: string; id: string; name: string } | null>(
+    return ctx.ui.custom(
       (tui: any, theme: Theme, _keybindings: any, done: (result: ModelEntry | null) => void) => {
         const listTheme = overlaySelectListTheme(theme);
         const border = (text: string) => theme.fg("dim", text);
@@ -1748,7 +1684,7 @@ export default function powerlineFooter(pi: ExtensionAPI) {
       ? ctx.modelRegistry?.isUsingOAuth?.(ctx.model) ?? false
       : false;
 
-    const thinkingLevel = thinkingLevelFromSession ?? getThinkingLevelFn?.() ?? "off";
+    const thinkingLevel = thinkingLevelFromSession ?? pi.getThinkingLevel() ?? "off";
     const profilesCache = getProfilesCache();
     const activeProfileMatch = ctx.model?.provider && ctx.model?.id
       ? findMatchingProfileIndex(profilesCache, ctx.model.provider, ctx.model.id, thinkingLevel)
@@ -1975,7 +1911,7 @@ export default function powerlineFooter(pi: ExtensionAPI) {
         };
       }, { placement: "aboveEditor" });
 
-      // Last prompt reminder below editor (configurable via showLastPrompt setting)
+      // Last prompt reminder below editor (configurable via powerline.showLastPrompt)
       ctx.ui.setWidget("powerline-last-prompt", () => {
         return {
           dispose() {},
@@ -2109,7 +2045,7 @@ export default function powerlineFooter(pi: ExtensionAPI) {
             horizontalAlign: "center",
           }),
         },
-      ).catch((error) => {
+      ).catch((error: unknown) => {
         console.debug("[powerline-footer] Welcome overlay failed:", error);
       });
     }, 100);
