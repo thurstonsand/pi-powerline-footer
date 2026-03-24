@@ -106,4 +106,22 @@ describe("resolveCustomPresetSettings", () => {
     expect(result.error).toBeUndefined();
     expect(result.value?.options).toEqual({});
   });
+
+  test("normalizes option keys to match normalized segment ids", () => {
+    const result = resolveCustomPresetSettings({
+      separator: "powerline-thin",
+      leftSegments: ["VERBOSITY"],
+      rightSegments: [],
+      secondarySegments: [],
+      options: {
+        Verbosity: { label: "low" },
+      },
+    });
+
+    expect(result.error).toBeUndefined();
+    expect(result.value?.leftSegments).toEqual(["verbosity"]);
+    expect(result.value?.options).toEqual({
+      verbosity: { label: "low" },
+    });
+  });
 });

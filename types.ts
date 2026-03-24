@@ -22,8 +22,8 @@ export type SemanticColor =
 // Color scheme mapping semantic names to actual colors
 export type ColorScheme = Partial<Record<SemanticColor, ColorValue>>;
 
-// Segment identifiers
-export type StatusLineSegmentId =
+// Built-in segment identifiers
+export type BuiltinStatusLineSegmentId =
   | "pi"
   | "model"
   | "path"
@@ -43,6 +43,9 @@ export type StatusLineSegmentId =
   | "cache_write"
   | "thinking"
   | "extension_statuses";
+
+// Segment identifiers can reference either built-ins or custom registered segments
+export type StatusLineSegmentId = BuiltinStatusLineSegmentId | (string & {});
 
 // Separator styles
 export type StatusLineSeparatorStyle =
@@ -69,10 +72,11 @@ export type StatusLinePreset =
 
 export type BuiltinStatusLinePreset = Exclude<StatusLinePreset, "custom">;
 
-// Per-segment options
-export interface StatusLineSegmentOptions {
+// Per-segment options. Built-ins use the typed keys below; custom segments read their
+// own entry via ctx.options[segmentId] / the render(ctx, options) second argument.
+export interface StatusLineSegmentOptions extends Record<string, unknown> {
   model?: { showThinkingLevel?: boolean };
-  path?: { 
+  path?: {
     mode?: "basename" | "abbreviated" | "full";
     maxLength?: number;
   };
@@ -193,5 +197,5 @@ export interface RenderedSegment {
 // Segment definition
 export interface StatusLineSegment {
   id: StatusLineSegmentId;
-  render(ctx: SegmentContext): RenderedSegment;
+  render(ctx: SegmentContext, options?: unknown): RenderedSegment;
 }
