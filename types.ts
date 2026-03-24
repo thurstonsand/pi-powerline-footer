@@ -19,7 +19,7 @@ export type SemanticColor =
 
 export type ColorScheme = Partial<Record<SemanticColor, ColorValue>>;
 
-export type StatusLineSegmentId =
+export type BuiltinStatusLineSegmentId =
   | "pi"
   | "model"
   | "path"
@@ -40,6 +40,7 @@ export type StatusLineSegmentId =
   | "thinking"
   | "extension_statuses";
 
+export type StatusLineSegmentId = BuiltinStatusLineSegmentId | (string & {});
 export type StatusLineSeparatorStyle =
   | "powerline"
   | "powerline-thin"
@@ -63,7 +64,7 @@ export type StatusLinePreset =
 
 export type BuiltinStatusLinePreset = Exclude<StatusLinePreset, "custom">;
 
-export interface StatusLineSegmentOptions {
+export interface StatusLineSegmentOptions extends Record<string, unknown> {
   model?: { showThinkingLevel?: boolean };
   path?: {
     mode?: "basename" | "abbreviated" | "full";
@@ -168,5 +169,5 @@ export interface RenderedSegment {
 
 export interface StatusLineSegment {
   id: StatusLineSegmentId;
-  render(ctx: SegmentContext): RenderedSegment;
+  render(ctx: SegmentContext, options?: unknown): RenderedSegment;
 }

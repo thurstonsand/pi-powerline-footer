@@ -84,7 +84,101 @@ Run `/powerline default` to switch back to the default preset.
 }
 ```
 
-Custom preset arrays use built-in segment ids from **Segments** below, and `separator` uses one of the names from **Separators**.
+Custom preset arrays can use built-in segment ids from **Segments** below plus any custom segment ids loaded from `~/.pi/agent/powerline/segments/` or registered programmatically. `separator` uses one of the names from **Separators**.
+
+### Custom segments
+
+Powerline discovers segment entrypoints from:
+
+```text
+~/.pi/agent/powerline/segments/
+```
+
+Discovery follows the same general shape as pi extensions:
+
+- direct files: `*.ts`, `*.js`
+- directories with `index.ts` or `index.js`
+- directories with `package.json` and `pi.segments`
+
+Entrypoints are loaded through `jiti`. That means TypeScript works directly, and segment packages can use their own `node_modules` after running `npm install` in that package.
+
+After adding or changing a segment file there, run `/reload`.
+
+Example single-file segment `~/.pi/agent/powerline/segments/verbosity.ts`:
+
+```ts
+export default function ({ registerSegment }) {
+  registerSegment({
+    id: "verbosity",
+    render(_ctx, options) {
+      return {
+        content: `🗣 ${options?.label ?? "low"}`,
+        visible: true,
+      };
+    },
+  });
+}
+```
+
+Then reference it from `powerline.custom` like any other segment:
+
+```json
+{
+  "powerline": {
+    "preset": "custom",
+    "custom": {
+      "separator": "powerline-thin",
+      "leftSegments": ["model", "verbosity", "path"],
+      "rightSegments": ["context_pct"],
+      "secondarySegments": [],
+      "options": {
+        "verbosity": { "label": "low" }
+      }
+    }
+  }
+}
+```
+
+A multi-file segment package can live in its own folder:
+
+```text
+~/.pi/agent/powerline/segments/task-badge/
+├── package.json
+├── src/
+│   ├── index.ts
+│   └── format.ts
+└── node_modules/
+```
+
+```json
+{
+  "name": "task-badge",
+  "pi": {
+    "segments": ["./src/index.ts"]
+  }
+}
+```
+
+```ts
+// src/index.ts
+import { formatTask } from "./format";
+
+export default function ({ registerSegment }) {
+  registerSegment({
+    id: "task_badge",
+    render(ctx) {
+      return {
+        content: formatTask(ctx.sessionId),
+        visible: true,
+      };
+    },
+  });
+}
+```
+
+A single entrypoint can register as many segments as it wants.
+
+If you want to register a segment from code instead of disk, import `registerSegment()` from `pi-powerline-footer` and use the same registration shape.
 
 ## Editor Stash
 
@@ -278,7 +372,7 @@ Configure via preset options: `path: { mode: "full" }`
 
 ## Segments
 
-`pi` · `model` · `thinking` · `path` · `git` · `subagents` · `token_in` · `token_out` · `token_total` · `cost` · `context_pct` · `context_total` · `time_spent` · `time` · `session` · `hostname` · `cache_read` · `cache_write`
+`pi` · `model` · `thinking` · `path` · `git` · `subagents` · `token_in` · `token_out` · `token_total` · `cost` · `context_pct` · `context_total` · `time_spent` · `time` · `session` · `hostname` · `cache_read` · `cache_write` · `extension_statuses`
 
 ## Separators
 
