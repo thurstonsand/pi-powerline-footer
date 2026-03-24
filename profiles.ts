@@ -1,9 +1,9 @@
 import {
-  isRecord,
   patchPowerlineSetting,
   readPowerlineSettings,
   readSettings,
 } from "./settings.js";
+import { isRecord } from "./json.js";
 
 export type ProfileThinkingLevel = "off" | "minimal" | "low" | "medium" | "high" | "xhigh";
 

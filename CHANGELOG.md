@@ -4,6 +4,12 @@
 
 ### Changed
 - Created nested `powerline` config — Settings are now organized under `powerline` as an object, including `preset`, `showLastPrompt`, `shortcuts`, `profiles`, and `vibe`. Legacy top-level keys are migrated into the nested object on start.
+- Settings writes now preserve nested config — Commands like `/powerline`, `/vibe`, and `/model-switcher` now update the nested `powerline` object instead of flattening or overwriting adjacent config.
+- `custom` preset now resolves from `powerline.custom` — The old static `custom` layout has been replaced by a settings-driven preset that flows through the same preset/layout path as the built-in presets. Missing or non-object `powerline.custom` now shows an explicit inline/UI error; other custom values defer to existing runtime fallback behavior.
+
+### Added
+- Migration docs for nested settings — README now includes before/after migration guidance for moving older top-level settings into the new nested `powerline` object.
+- Custom preset docs and tests — Added README coverage for `powerline.custom` plus tests for custom preset normalization, missing custom config errors, and loose runtime fallback behavior for invalid custom values.
 
 ## [0.4.8] - 2026-03-27
 

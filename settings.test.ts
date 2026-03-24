@@ -3,6 +3,7 @@ import { describe, expect, test } from "vitest";
 import {
   applyPowerlineSettings,
   migrateLegacyPowerlineSettings,
+  normalizePowerlineSettings,
   readPowerlineSettings,
 } from "./settings.js";
 
@@ -108,6 +109,36 @@ describe("migrateLegacyPowerlineSettings", () => {
           theme: "nested-theme",
           mode: "file",
           model: "openai/gpt-5-mini",
+        },
+      },
+    });
+  });
+
+  test("preserves nested custom preset config for later validation", () => {
+    expect(
+      normalizePowerlineSettings({
+        powerline: {
+          preset: "custom",
+          custom: {
+            separator: "powerline-thin",
+            leftSegments: ["model", "path"],
+            rightSegments: ["context_pct"],
+            secondarySegments: [],
+            options: {
+              path: { mode: "abbreviated", maxLength: 60 },
+            },
+          },
+        },
+      }),
+    ).toEqual({
+      preset: "custom",
+      custom: {
+        separator: "powerline-thin",
+        leftSegments: ["model", "path"],
+        rightSegments: ["context_pct"],
+        secondarySegments: [],
+        options: {
+          path: { mode: "abbreviated", maxLength: 60 },
         },
       },
     });

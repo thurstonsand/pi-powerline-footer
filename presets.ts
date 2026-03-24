@@ -1,5 +1,12 @@
-import type { ColorScheme, PresetDef, StatusLinePreset } from "./types.js";
+import {
+  type BuiltinStatusLinePreset,
+  type ColorScheme,
+  type PowerlineSettings,
+  type PresetDef,
+  type ResolvedPresetDef,
+} from "./types.js";
 import { getDefaultColors } from "./theme.js";
+import { resolveCustomPresetSettings } from "./custom.js";
 
 // Get base colors from theme.ts (single source of truth)
 const DEFAULT_COLORS: ColorScheme = getDefaultColors();
@@ -23,7 +30,17 @@ const NERD_COLORS: ColorScheme = {
   cost: "warning",
 };
 
-export const PRESETS: Record<StatusLinePreset, PresetDef> = {
+export const PRESET_NAMES = [
+  "default",
+  "minimal",
+  "compact",
+  "full",
+  "nerd",
+  "ascii",
+  "custom",
+] as const;
+
+const BUILTIN_PRESETS: Record<BuiltinStatusLinePreset, PresetDef> = {
   default: {
     leftSegments: ["pi", "model", "thinking", "path", "git", "context_pct", "cache_read", "cost"],
     rightSegments: [],
@@ -96,16 +113,46 @@ export const PRESETS: Record<StatusLinePreset, PresetDef> = {
       git: { showBranch: true, showStaged: true, showUnstaged: true, showUntracked: true },
     },
   },
-
-  custom: {
-    leftSegments: ["model", "path", "git"],
-    rightSegments: ["token_total", "cost", "context_pct"],
-    separator: "powerline-thin",
-    colors: DEFAULT_COLORS,
-    segmentOptions: {},
-  },
 };
 
-export function getPreset(name: StatusLinePreset): PresetDef {
-  return PRESETS[name] ?? PRESETS.default;
+function getBuiltinPreset(name: BuiltinStatusLinePreset): PresetDef {
+  return BUILTIN_PRESETS[name] ?? BUILTIN_PRESETS.default;
+}
+
+export function resolvePresetDefinition(
+  settings: Pick<PowerlineSettings, "preset" | "custom">,
+): ResolvedPresetDef {
+  const preset = settings.preset ?? "default";
+
+  if (preset !== "custom") {
+    return {
+      preset,
+      definition: getBuiltinPreset(preset),
+    };
+  }
+
+  const custom = resolveCustomPresetSettings(settings.custom);
+  if (custom.error || !custom.value) {
+    return {
+      preset,
+      definition: getBuiltinPreset("default"),
+      error: custom.error ?? 'powerline.preset is "custom" but powerline.custom is invalid',
+    };
+  }
+
+  return {
+    preset,
+    definition: {
+      leftSegments: custom.value.leftSegments,
+      rightSegments: custom.value.rightSegments,
+      secondarySegments: custom.value.secondarySegments,
+      separator: custom.value.separator,
+      colors: DEFAULT_COLORS,
+      segmentOptions: custom.value.options,
+    },
+  };
+}
+
+export function getPreset(name: BuiltinStatusLinePreset): PresetDef {
+  return getBuiltinPreset(name);
 }
