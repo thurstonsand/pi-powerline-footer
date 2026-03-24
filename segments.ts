@@ -1,7 +1,14 @@
 import { hostname as osHostname } from "node:os";
 import { basename } from "node:path";
 import { visibleWidth } from "@mariozechner/pi-tui";
-import type { RenderedSegment, SegmentContext, SemanticColor, StatusLineSegment, StatusLineSegmentId } from "./types.js";
+import type {
+  BuiltinStatusLineSegmentId,
+  RenderedSegment,
+  SegmentContext,
+  SemanticColor,
+  StatusLineSegment,
+  StatusLineSegmentId,
+} from "./types.js";
 import { fg, rainbow, applyColor } from "./theme.js";
 import { getIcons, SEP_DOT, getThinkingText } from "./icons.js";
 
@@ -428,7 +435,7 @@ const extensionStatusesSegment: StatusLineSegment = {
 // Segment Registry
 // ═══════════════════════════════════════════════════════════════════════════
 
-export const SEGMENTS: Record<StatusLineSegmentId, StatusLineSegment> = {
+export const SEGMENTS: Record<BuiltinStatusLineSegmentId, StatusLineSegment> = {
   pi: piSegment,
   model: modelSegment,
   path: pathSegment,

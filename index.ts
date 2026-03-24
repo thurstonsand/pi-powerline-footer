@@ -29,7 +29,11 @@ import {
   readSettings,
 } from "./settings.js";
 import { getSeparator } from "./separators.js";
-import { renderSegment } from "./segments.js";
+import {
+  getCustomSegmentLoadErrors,
+  loadSegmentsFromDirectory,
+  renderSegment,
+} from "./segment-registry.js";
 import { getGitStatus, invalidateGitStatus, invalidateGitBranch } from "./git-status.js";
 import { ansi, getFgAnsiCode } from "./colors.js";
 import { WelcomeComponent, WelcomeHeader, discoverLoadedCounts, getRecentSessions } from "./welcome.js";
@@ -614,6 +618,7 @@ export default function powerlineFooter(pi: ExtensionAPI) {
   let lastLayoutTimestamp = 0;
   let profileSwitchInProgress = false;
   let lastCustomPresetErrorNotified: string | null = null;
+  let lastCustomSegmentErrorsNotified: string | null = null;
 
   function overlaySelectListTheme(theme: Theme) {
     return {
@@ -641,6 +646,40 @@ export default function powerlineFooter(pi: ExtensionAPI) {
       ctx.ui.notify(error, "error");
     }
     lastCustomPresetErrorNotified = error;
+  }
+
+  function reportCustomSegmentErrors(ctx?: any): void {
+    const errors = getCustomSegmentLoadErrors();
+    if (errors.length === 0) {
+      lastCustomSegmentErrorsNotified = null;
+      return;
+    }
+
+    const signature = errors.join("\n");
+    if (lastCustomSegmentErrorsNotified === signature) {
+      return;
+    }
+
+    for (const error of errors) {
+      console.error(`[powerline-footer] ${error}`);
+    }
+
+    if (ctx?.hasUI) {
+      const count = errors.length;
+      ctx.ui.notify(
+        count === 1
+          ? errors[0]
+          : `${count} custom segment files failed to load (see console)`,
+        "error",
+      );
+    }
+
+    lastCustomSegmentErrorsNotified = signature;
+  }
+
+  async function refreshCustomSegments(ctx?: any): Promise<void> {
+    await loadSegmentsFromDirectory();
+    reportCustomSegmentErrors(ctx);
   }
 
   async function showSelectOverlay(
@@ -731,6 +770,8 @@ export default function powerlineFooter(pi: ExtensionAPI) {
     lastUserPrompt = "";
     isStreaming = false;
     stashedEditorText = null;
+
+    await refreshCustomSegments(ctx);
 
     const rawSettings = readSettings("powerline-footer");
     const settings = readPowerlineSettings(rawSettings);
@@ -1287,6 +1328,10 @@ export default function powerlineFooter(pi: ExtensionAPI) {
 
       const preset = normalizePreset(args);
       if (preset) {
+        if (preset === "custom") {
+          await refreshCustomSegments(ctx);
+        }
+
         applyPowerlineConfig({
           ...config.settings,
           preset,
@@ -2091,3 +2136,6 @@ export default function powerlineFooter(pi: ExtensionAPI) {
     }, 100);
   }
 }
+
+export { registerSegment } from "./segment-registry.js";
+export type { RenderedSegment, SegmentContext, StatusLineSegment } from "./types.js";

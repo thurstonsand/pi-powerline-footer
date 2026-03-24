@@ -36,9 +36,7 @@ export function normalizeCustomSettings(value: unknown): unknown {
   }
 
   if (hasOwn(value, "options")) {
-    normalized.options = isRecord(value.options)
-      ? { ...value.options }
-      : value.options;
+    normalized.options = normalizeSegmentOptions(value.options);
   }
 
   return normalized;
@@ -64,6 +62,26 @@ function normalizeSegmentList(value: unknown): StatusLineSegmentId[] {
   )) as StatusLineSegmentId[];
 }
 
+function normalizeSegmentOptions(value: unknown): StatusLineSegmentOptions {
+  if (!isRecord(value)) {
+    return {};
+  }
+
+  const normalized: Record<string, unknown> = {};
+  for (const [key, optionValue] of Object.entries(value)) {
+    const normalizedKey = key.trim().toLowerCase();
+    if (!normalizedKey) {
+      continue;
+    }
+
+    normalized[normalizedKey] = isRecord(optionValue)
+      ? { ...optionValue }
+      : optionValue;
+  }
+
+  return normalized as StatusLineSegmentOptions;
+}
+
 export function resolveCustomPresetSettings(value: unknown): {
   value?: NormalizedCustomPresetSettings;
   error?: string;
@@ -82,9 +100,7 @@ export function resolveCustomPresetSettings(value: unknown): {
       leftSegments: normalizeSegmentList(value.leftSegments),
       rightSegments: normalizeSegmentList(value.rightSegments),
       secondarySegments: normalizeSegmentList(value.secondarySegments),
-      options: isRecord(value.options)
-        ? { ...value.options } as StatusLineSegmentOptions
-        : {},
+      options: normalizeSegmentOptions(value.options),
     },
   };
 }
