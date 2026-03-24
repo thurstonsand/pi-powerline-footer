@@ -167,7 +167,7 @@ export interface RenderedSegment {
   visible: boolean;
 }
 
-export interface StatusLineSegment {
+export interface StatusLineSegment<TOptions = unknown> {
   id: StatusLineSegmentId;
-  render(ctx: SegmentContext, options?: unknown): RenderedSegment;
+  render(ctx: SegmentContext, options?: TOptions): RenderedSegment;
 }

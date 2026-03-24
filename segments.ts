@@ -8,6 +8,7 @@ import type {
   SemanticColor,
   StatusLineSegment,
   StatusLineSegmentId,
+  StatusLineSegmentOptions,
 } from "./types.js";
 import { fg, rainbow, applyColor } from "./theme.js";
 import { getIcons, SEP_DOT, getThinkingText } from "./icons.js";
@@ -47,6 +48,11 @@ function formatDuration(ms: number): string {
 // Segment Implementations
 // ═══════════════════════════════════════════════════════════════════════════
 
+type ModelSegmentOptions = NonNullable<StatusLineSegmentOptions["model"]>;
+type PathSegmentOptions = NonNullable<StatusLineSegmentOptions["path"]>;
+type GitSegmentOptions = NonNullable<StatusLineSegmentOptions["git"]>;
+type TimeSegmentOptions = NonNullable<StatusLineSegmentOptions["time"]>;
+
 const piSegment: StatusLineSegment = {
   id: "pi",
   render(ctx) {
@@ -57,11 +63,11 @@ const piSegment: StatusLineSegment = {
   },
 };
 
-const modelSegment: StatusLineSegment = {
+const modelSegment: StatusLineSegment<ModelSegmentOptions> = {
   id: "model",
-  render(ctx) {
+  render(ctx, options) {
     const icons = getIcons();
-    const opts = ctx.options.model ?? {};
+    const opts = options ?? {};
 
     let content: string;
 
@@ -96,11 +102,11 @@ const modelSegment: StatusLineSegment = {
   },
 };
 
-const pathSegment: StatusLineSegment = {
+const pathSegment: StatusLineSegment<PathSegmentOptions> = {
   id: "path",
-  render(ctx) {
+  render(ctx, options) {
     const icons = getIcons();
-    const opts = ctx.options.path ?? {};
+    const opts = options ?? {};
     const mode = opts.mode ?? "basename";
 
     let pwd = process.cwd();
@@ -134,11 +140,11 @@ const pathSegment: StatusLineSegment = {
   },
 };
 
-const gitSegment: StatusLineSegment = {
+const gitSegment: StatusLineSegment<GitSegmentOptions> = {
   id: "git",
-  render(ctx) {
+  render(ctx, options) {
     const icons = getIcons();
-    const opts = ctx.options.git ?? {};
+    const opts = options ?? {};
     const { branch, staged, unstaged, untracked } = ctx.git;
     const gitStatus = (staged > 0 || unstaged > 0 || untracked > 0) 
       ? { staged, unstaged, untracked } 
@@ -325,11 +331,11 @@ const timeSpentSegment: StatusLineSegment = {
   },
 };
 
-const timeSegment: StatusLineSegment = {
+const timeSegment: StatusLineSegment<TimeSegmentOptions> = {
   id: "time",
-  render(ctx) {
+  render(ctx, options) {
     const icons = getIcons();
-    const opts = ctx.options.time ?? {};
+    const opts = options ?? {};
     const now = new Date();
 
     let hours = now.getHours();
@@ -462,5 +468,5 @@ export function renderSegment(id: StatusLineSegmentId, ctx: SegmentContext): Ren
   if (!segment) {
     return { content: "", visible: false };
   }
-  return segment.render(ctx);
+  return segment.render(ctx, ctx.options[id]);
 }

@@ -180,6 +180,37 @@ A single entrypoint can register as many segments as it wants.
 
 If you want to register a segment from code instead of disk, import `registerSegment()` from `pi-powerline-footer` and use the same registration shape.
 
+#### Custom segment TypeScript API
+
+For typed custom segments, the package root exports:
+
+- `SegmentContext`
+- `StatusLineSegment`
+- `RenderedSegment`
+- `StatusLineSegmentId`
+- `StatusLineSegmentOptions`
+- `SegmentLoaderAPI`
+
+Example:
+
+```ts
+import type { SegmentContext, SegmentLoaderAPI, StatusLineSegment } from "pi-powerline-footer";
+
+const segment: StatusLineSegment<{ label?: string }> = {
+  id: "example",
+  render(ctx: SegmentContext, options) {
+    return {
+      content: options?.label ?? ctx.model?.id ?? "none",
+      visible: true,
+    };
+  },
+};
+
+export default function ({ registerSegment }: SegmentLoaderAPI) {
+  registerSegment(segment);
+}
+```
+
 ## Editor Stash
 
 Use `Alt+S` as a quick stash toggle while drafting. It keeps one active stash and clears the editor when stashing.

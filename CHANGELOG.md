@@ -11,6 +11,10 @@
 - Migration docs for nested settings — README now includes before/after migration guidance for moving older top-level settings into the new nested `powerline` object.
 - Custom preset docs and tests — Added README coverage for `powerline.custom` plus tests for custom preset normalization, missing custom config errors, and loose runtime fallback behavior for invalid custom values.
 - Custom segment registry and package-style loader — Added `registerSegment()` plus segment discovery from `~/.pi/agent/powerline/segments/` using a pi-extension-style loader powered by `jiti`. Segment entrypoints can be direct `.ts`/`.js` files, directory `index.ts`/`index.js` files, or package manifests with `pi.segments`, and a single entrypoint can register multiple segments.
+- Public custom-segment typing exports — The package root now exports `SegmentContext`, `StatusLineSegment`, `RenderedSegment`, `StatusLineSegmentId`, `StatusLineSegmentOptions`, and `SegmentLoaderAPI` so custom segments can type against the public API without deep imports.
+
+### Changed
+- Builtin segment option typing — `StatusLineSegment` now accepts a typed `options` generic, and builtin segments use their specific option shapes when rendering.
 
 ## [0.4.8] - 2026-03-27
 
