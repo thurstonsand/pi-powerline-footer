@@ -38,6 +38,36 @@ describe("readPowerlineSettings", () => {
       },
     });
   });
+
+  test("preserves nested custom preset config for later resolution", () => {
+    expect(
+      readPowerlineSettings({
+        powerline: {
+          preset: "custom",
+          custom: {
+            separator: "powerline-thin",
+            leftSegments: ["model", "path"],
+            rightSegments: ["context_pct"],
+            secondarySegments: [],
+            options: {
+              path: { mode: "abbreviated", maxLength: 60 },
+            },
+          },
+        },
+      }),
+    ).toEqual({
+      preset: "custom",
+      custom: {
+        separator: "powerline-thin",
+        leftSegments: ["model", "path"],
+        rightSegments: ["context_pct"],
+        secondarySegments: [],
+        options: {
+          path: { mode: "abbreviated", maxLength: 60 },
+        },
+      },
+    });
+  });
 });
 
 describe("migrateLegacyPowerlineSettings", () => {

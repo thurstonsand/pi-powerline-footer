@@ -2,8 +2,9 @@ import {
   copyToClipboard,
   getAgentDir,
   type ExtensionAPI,
+  type ExtensionContext,
   type ReadonlyFooterDataProvider,
-  type Theme,<D-A>
+  type Theme,
 } from "@mariozechner/pi-coding-agent";
 import type { AssistantMessage } from "@mariozechner/pi-ai";
 import { type KeyId, type SelectItem, SelectList, truncateToWidth, visibleWidth } from "@mariozechner/pi-tui";
@@ -13,20 +14,25 @@ import { join, dirname } from "node:path";
 import type {
   ColorScheme,
   PowerlineSettings,
+  PresetDef,
+  ResolvedPresetDef,
   SegmentContext,
   StatusLinePreset,
-  StatusLineSegmentId,
 } from "./types.js";
-import { getPreset, PRESETS } from "./presets.js";
+import { CUSTOM_PRESET, PRESET_NAMES, resolvePresetDefinition } from "./presets.js";
+import { isRecord } from "./json.js";
 import {
   migrateLegacyPowerlineSettingsFile,
+  normalizePreset,
   patchPowerlineSetting,
   readPowerlineSettings,
-  normalizePreset,
   readSettings,
 } from "./settings.js";
 import { getSeparator } from "./separators.js";
-import { renderSegment } from "./segments.js";
+import {
+  loadSegmentsFromDirectory,
+  renderSegment,
+} from "./segment-registry.js";
 import { getGitStatus, invalidateGitStatus, invalidateGitBranch } from "./git-status.js";
 import { ansi, getFgAnsiCode } from "./colors.js";
 import { WelcomeComponent, WelcomeHeader, discoverLoadedCounts, getRecentSessions } from "./welcome.js";
@@ -53,11 +59,13 @@ import {
 // ═══════════════════════════════════════════════════════════════════════════
 
 interface PowerlineConfig {
-  preset: StatusLinePreset;
+  settings: PowerlineSettings;
+  resolvedPreset: ResolvedPresetDef;
 }
 
 let config: PowerlineConfig = {
-  preset: "default",
+  settings: {},
+  resolvedPreset: resolvePresetDefinition({ preset: "default" }),
 };
 
 interface PowerlineShortcuts {
@@ -174,10 +182,6 @@ function trackPromptHistory(editor: any): void {
   };
   editor[PROMPT_HISTORY_TRACKED] = true;
   snapshotPromptHistory(editor);
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function getStashHistoryPath(): string {
@@ -475,7 +479,7 @@ function resolveShortcutConfig(settings: PowerlineSettings): PowerlineShortcuts 
 
 /** Render a single segment and return its content with width */
 function renderSegmentWithWidth(
-  segId: StatusLineSegmentId,
+  segId: string,
   ctx: SegmentContext
 ): { content: string; width: number; visible: boolean } {
   const rendered = renderSegment(segId, ctx);
@@ -488,7 +492,7 @@ function renderSegmentWithWidth(
 /** Build content string from pre-rendered parts */
 function buildContentFromParts(
   parts: string[],
-  presetDef: ReturnType<typeof getPreset>
+  presetDef: PresetDef,
 ): string {
   if (parts.length === 0) return "";
   const separatorDef = getSeparator(presetDef.separator);
@@ -504,8 +508,8 @@ function buildContentFromParts(
  */
 function computeResponsiveLayout(
   ctx: SegmentContext,
-  presetDef: ReturnType<typeof getPreset>,
-  availableWidth: number
+  presetDef: PresetDef,
+  availableWidth: number,
 ): { topContent: string; secondaryContent: string } {
   const separatorDef = getSeparator(presetDef.separator);
   const sepWidth = visibleWidth(separatorDef.left) + 2; // separator + spaces around it
@@ -609,6 +613,44 @@ export default function powerlineFooter(pi: ExtensionAPI) {
     };
   }
 
+  function reportCustomPresetError(ctx: ExtensionContext): void {
+    if (!config.resolvedPreset.error) {
+      return;
+    }
+
+    console.error(`[powerline-footer] ${config.resolvedPreset.error}`);
+    if (ctx.hasUI) {
+      ctx.ui.notify(config.resolvedPreset.error, "error");
+    }
+  }
+
+  function reportCustomSegmentErrors(
+    errors: string[],
+    ctx: ExtensionContext,
+  ): void {
+    if (errors.length === 0) {
+      return;
+    }
+
+    for (const error of errors) {
+      console.error(`[powerline-footer] ${error}`);
+    }
+
+    if (ctx.hasUI) {
+      ctx.ui.notify(
+        errors.length === 1
+          ? errors[0]
+          : `${errors.length} custom segment files failed to load (see console)`,
+        "error",
+      );
+    }
+  }
+
+  async function refreshCustomSegments(ctx: ExtensionContext): Promise<void> {
+    const result = await loadSegmentsFromDirectory();
+    reportCustomSegmentErrors(result.errors, ctx);
+  }
+
   async function showSelectOverlay(
     ctx: any,
     title: string,
@@ -671,17 +713,22 @@ export default function powerlineFooter(pi: ExtensionAPI) {
     isStreaming = false;
     stashedEditorText = null;
 
+    await refreshCustomSegments(ctx);
+
     const rawSettings = readSettings("powerline-footer");
     const settings = readPowerlineSettings(rawSettings);
     showLastPrompt = settings.showLastPrompt ?? true;
-    config.preset = settings.preset ?? "default";
+    config = {
+      settings,
+      resolvedPreset: resolvePresetDefinition(settings),
+    };
+    reportCustomPresetError(ctx);
     stashedPromptHistory = readPersistedStashHistory();
 
     const runtimeCtx = ctx as any;
     getThinkingLevelFn = typeof runtimeCtx.getThinkingLevel === "function"
       ? () => runtimeCtx.getThinkingLevel()
       : null;
-
     if (ctx.hasUI) {
       ctx.ui.setStatus("stash", undefined);
     }
@@ -1013,7 +1060,21 @@ export default function powerlineFooter(pi: ExtensionAPI) {
 
       const preset = normalizePreset(args);
       if (preset) {
-        config.preset = preset;
+        if (preset === CUSTOM_PRESET) {
+          await refreshCustomSegments(ctx);
+        }
+
+        config = {
+          settings: {
+            ...config.settings,
+            preset,
+          },
+          resolvedPreset: resolvePresetDefinition({
+            ...config.settings,
+            preset,
+          }),
+        };
+        reportCustomPresetError(ctx);
         lastLayoutResult = null;
         if (enabled) {
           setupCustomEditor(ctx);
@@ -1028,7 +1089,7 @@ export default function powerlineFooter(pi: ExtensionAPI) {
       }
 
       // Show available presets
-      const presetList = Object.keys(PRESETS).join(", ");
+      const presetList = PRESET_NAMES.join(", ");
       ctx.ui.notify(`Available presets: ${presetList}`, "info");
     },
   });
@@ -1239,7 +1300,7 @@ export default function powerlineFooter(pi: ExtensionAPI) {
   });
 
   function buildSegmentContext(ctx: any, theme: Theme): SegmentContext {
-    const presetDef = getPreset(config.preset);
+    const presetDef = config.resolvedPreset.definition;
     const colors: ColorScheme = presetDef.colors ?? getDefaultColors();
 
     // Build usage stats and get thinking level from session
@@ -1321,14 +1382,26 @@ export default function powerlineFooter(pi: ExtensionAPI) {
     if (lastLayoutResult && lastLayoutWidth === width && now - lastLayoutTimestamp < 50) {
       return lastLayoutResult;
     }
-    
-    const presetDef = getPreset(config.preset);
+
+    if (config.resolvedPreset.error) {
+      const availableWidth = Math.max(1, width - 2);
+      const message = truncateToWidth(`⚠ ${config.resolvedPreset.error}`, availableWidth, "…");
+      lastLayoutWidth = width;
+      lastLayoutResult = {
+        topContent: ` ${theme.fg("error", message)} `,
+        secondaryContent: "",
+      };
+      lastLayoutTimestamp = now;
+      return lastLayoutResult;
+    }
+
+    const presetDef = config.resolvedPreset.definition;
     const segmentCtx = buildSegmentContext(currentCtx, theme);
-    
+
     lastLayoutWidth = width;
     lastLayoutResult = computeResponsiveLayout(segmentCtx, presetDef, width);
     lastLayoutTimestamp = now;
-    
+
     return lastLayoutResult;
   }
 
@@ -1647,3 +1720,12 @@ export default function powerlineFooter(pi: ExtensionAPI) {
     }, 100);
   }
 }
+
+// Public types for file-based custom segment entrypoints.
+export type { SegmentLoaderAPI } from "./segment-registry.js";
+export type {
+  RenderedSegment,
+  SegmentContext,
+  StatusLineSegment,
+  StatusLineSegmentOptions,
+} from "./types.js";
