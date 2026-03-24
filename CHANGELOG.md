@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+### Changed
+- Created nested `powerline` config — Settings are now organized under `powerline` as an object, including `preset`, `showLastPrompt`, `shortcuts`, `profiles`, and `vibe`. Legacy top-level keys are migrated into the nested object on start.
+
 ## [0.4.8] - 2026-03-27
 
 ### Fixed
