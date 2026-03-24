@@ -48,11 +48,103 @@ Activates automatically. Toggle with `/powerline`, switch presets with `/powerli
 | `full` | Everything including hostname, time, abbreviated path |
 | `nerd` | Maximum detail for Nerd Font users |
 | `ascii` | Safe for any terminal |
+| `custom` | User-defined layout from `powerline.custom` |
 
 **Environment:** `POWERLINE_NERD_FONTS=1` to force Nerd Fonts, `=0` for ASCII.
 
 Preset selection is saved to `~/.pi/agent/settings.json` under `powerline.preset` and restored on startup.
 Run `/powerline default` to switch back to the default preset.
+
+### Custom preset
+
+`custom` resolves its layout from `powerline.custom`.
+
+```json
+{
+  "powerline": {
+    "preset": "custom",
+    "custom": {
+      "separator": "powerline-thin",
+      "leftSegments": ["model", "path", "git"],
+      "rightSegments": ["time", "context_pct"],
+      "secondarySegments": ["extension_statuses"],
+      "options": {
+        "path": { "mode": "abbreviated", "maxLength": 40 },
+        "git": {
+          "showBranch": true,
+          "showStaged": true,
+          "showUnstaged": true,
+          "showUntracked": true
+        },
+        "time": { "format": "12h", "showSeconds": false }
+      }
+    }
+  }
+}
+```
+
+`leftSegments` and `rightSegments` are appended in order into the main status row; `rightSegments` does not right-align to the edge of the terminal.
+
+`secondarySegments` render in the row below the editor.
+
+Segment arrays can include built-in segment ids plus any custom segment ids loaded from `~/.pi/agent/powerline/segments/`.
+
+### Custom segments
+
+Custom segments are loaded from:
+
+```text
+~/.pi/agent/powerline/segments/
+```
+
+Supported entrypoints:
+
+- `*.ts` / `*.js`
+- directories with `index.ts` / `index.js`
+- directories with `package.json` and `pi.segments`
+
+Segments are loaded through `jiti`, so TypeScript works directly and package-style segments can use local `node_modules`. The loader also mirrors pi extension module resolution for pi runtime packages, so custom segments can import `@mariozechner/pi-coding-agent`, `@mariozechner/pi-agent-core`, `@mariozechner/pi-ai`, `@mariozechner/pi-tui`, and `typebox` without installing those packages beside the segment. After adding or changing a segment, run `/reload`.
+
+Set segment-specific options in `powerline.custom.options.<segment-id>`. They are passed as the second argument to `render(ctx, options)`.
+
+Example:
+
+```ts
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
+export default function ({ registerSegment }) {
+  registerSegment({
+    id: "dev_note",
+    render(_ctx, options) {
+      const file = join(process.env.PI_CODING_AGENT_DIR, "powerline-note.txt");
+      const text = readFileSync(file, "utf-8").trim();
+
+      return {
+        content: `${options?.prefix ?? ""}${text || "note empty"}`,
+        visible: true,
+      };
+    },
+  });
+}
+```
+
+```json
+{
+  "powerline": {
+    "preset": "custom",
+    "custom": {
+      "separator": "powerline-thin",
+      "leftSegments": ["dev_note", "path"],
+      "rightSegments": [],
+      "secondarySegments": [],
+      "options": {
+        "dev_note": { "prefix": "note: " }
+      }
+    }
+  }
+}
+```
 
 ## Editor Stash
 

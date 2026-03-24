@@ -3,6 +3,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
 import type { PowerlineSettings, PowerlineVibeSettings, StatusLinePreset } from "./types.js";
+import { isRecord } from "./json.js";
 
 interface LegacyPowerlineSettings {
   powerline?: unknown;
@@ -34,12 +35,8 @@ const LEGACY_POWERLINE_KEYS = [
   ...LEGACY_POWERLINE_VIBE_KEYS,
 ] as const;
 
-export function getSettingsPath(): string {
+function getSettingsPath(): string {
   return join(getAgentDir(), "settings.json");
-}
-
-export function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 export function readSettings(logPrefix: string = "powerline-footer"): Record<string, unknown> {
@@ -239,10 +236,7 @@ export function readPowerlineSettings(rawSettings: Record<string, unknown>): Pow
   return settings;
 }
 
-export function applyPowerlineSettings(
-  rawSettings: Record<string, unknown>,
-  settings: PowerlineSettings,
-): void {
+export function applyPowerlineSettings(rawSettings: Record<string, unknown>, settings: PowerlineSettings): void {
   const nextPowerline = isRecord(rawSettings.powerline) ? { ...rawSettings.powerline } : {};
 
   if (settings.preset) {

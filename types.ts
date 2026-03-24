@@ -22,8 +22,8 @@ export type SemanticColor =
 // Color scheme mapping semantic names to actual colors
 export type ColorScheme = Partial<Record<SemanticColor, ColorValue>>;
 
-// Segment identifiers
-export type StatusLineSegmentId =
+// Built-in segment identifiers
+export type BuiltinSegmentId =
   | "pi"
   | "model"
   | "path"
@@ -58,24 +58,43 @@ export type StatusLineSeparatorStyle =
   | "star";
 
 // Preset names
-export type StatusLinePreset =
+export type BuiltinStatusLinePreset =
   | "default"
   | "minimal"
   | "compact"
   | "full"
   | "nerd"
-  | "ascii"
-  | "custom";
+  | "ascii";
+
+export type StatusLinePreset = BuiltinStatusLinePreset | "custom";
+
+export interface ModelSegmentOptions {
+  showThinkingLevel?: boolean;
+}
+
+export interface PathSegmentOptions {
+  mode?: "basename" | "abbreviated" | "full";
+  maxLength?: number;
+}
+
+export interface GitSegmentOptions {
+  showBranch?: boolean;
+  showStaged?: boolean;
+  showUnstaged?: boolean;
+  showUntracked?: boolean;
+}
+
+export interface TimeSegmentOptions {
+  format?: "12h" | "24h";
+  showSeconds?: boolean;
+}
 
 // Per-segment options
-export interface StatusLineSegmentOptions {
-  model?: { showThinkingLevel?: boolean };
-  path?: { 
-    mode?: "basename" | "abbreviated" | "full";
-    maxLength?: number;
-  };
-  git?: { showBranch?: boolean; showStaged?: boolean; showUnstaged?: boolean; showUntracked?: boolean };
-  time?: { format?: "12h" | "24h"; showSeconds?: boolean };
+export interface StatusLineSegmentOptions extends Record<string, unknown> {
+  model?: ModelSegmentOptions;
+  path?: PathSegmentOptions;
+  git?: GitSegmentOptions;
+  time?: TimeSegmentOptions;
 }
 
 export interface PowerlineVibeSettings {
@@ -88,24 +107,38 @@ export interface PowerlineVibeSettings {
   maxLength?: number;
 }
 
+export interface CustomPresetSettings {
+  separator: StatusLineSeparatorStyle;
+  leftSegments: string[];
+  rightSegments: string[];
+  secondarySegments: string[];
+  options: StatusLineSegmentOptions;
+}
+
+// Preset definition
+export interface PresetDef {
+  leftSegments: string[];
+  rightSegments: string[];
+  /** Secondary row segments (shown in footer, above sub bar) */
+  secondarySegments?: string[];
+  separator: StatusLineSeparatorStyle;
+  segmentOptions?: StatusLineSegmentOptions;
+  /** Color scheme for this preset */
+  colors?: ColorScheme;
+}
+
+export interface ResolvedPresetDef {
+  preset: StatusLinePreset;
+  definition: PresetDef;
+  error?: string;
+}
+
 export interface PowerlineSettings {
   preset?: StatusLinePreset;
   showLastPrompt?: boolean;
   shortcuts?: Record<string, unknown>;
   vibe?: PowerlineVibeSettings;
-  custom?: Record<string, unknown>;
-}
-
-// Preset definition
-export interface PresetDef {
-  leftSegments: StatusLineSegmentId[];
-  rightSegments: StatusLineSegmentId[];
-  /** Secondary row segments (shown in footer, above sub bar) */
-  secondarySegments?: StatusLineSegmentId[];
-  separator: StatusLineSeparatorStyle;
-  segmentOptions?: StatusLineSegmentOptions;
-  /** Color scheme for this preset */
-  colors?: ColorScheme;
+  custom?: unknown;
 }
 
 // Separator definition
@@ -142,7 +175,7 @@ export interface SegmentContext {
   model: { id: string; name?: string; reasoning?: boolean; contextWindow?: number } | undefined;
   thinkingLevel: string;
   sessionId: string | undefined;
-  
+
   // Computed
   usageStats: UsageStats;
   contextPercent: number;
@@ -150,16 +183,16 @@ export interface SegmentContext {
   autoCompactEnabled: boolean;
   usingSubscription: boolean;
   sessionStartTime: number;
-  
+
   // Git
   git: GitStatus;
-  
+
   // Extension statuses
   extensionStatuses: ReadonlyMap<string, string>;
-  
+
   // Options
   options: StatusLineSegmentOptions;
-  
+
   // Theming
   theme: Theme;
   colors: ColorScheme;
@@ -172,7 +205,7 @@ export interface RenderedSegment {
 }
 
 // Segment definition
-export interface StatusLineSegment {
-  id: StatusLineSegmentId;
-  render(ctx: SegmentContext): RenderedSegment;
+export interface StatusLineSegment<TOptions = unknown> {
+  id: string;
+  render(ctx: SegmentContext, options?: TOptions): RenderedSegment;
 }

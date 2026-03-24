@@ -1,7 +1,17 @@
 import { hostname as osHostname } from "node:os";
 import { basename } from "node:path";
 import { visibleWidth } from "@mariozechner/pi-tui";
-import type { RenderedSegment, SegmentContext, SemanticColor, StatusLineSegment, StatusLineSegmentId } from "./types.js";
+import type {
+  BuiltinSegmentId,
+  GitSegmentOptions,
+  ModelSegmentOptions,
+  PathSegmentOptions,
+  RenderedSegment,
+  SegmentContext,
+  SemanticColor,
+  StatusLineSegment,
+  TimeSegmentOptions,
+} from "./types.js";
 import { fg, rainbow, applyColor } from "./theme.js";
 import { getIcons, SEP_DOT, getThinkingText } from "./icons.js";
 
@@ -50,11 +60,11 @@ const piSegment: StatusLineSegment = {
   },
 };
 
-const modelSegment: StatusLineSegment = {
+const modelSegment: StatusLineSegment<ModelSegmentOptions> = {
   id: "model",
-  render(ctx) {
+  render(ctx, options) {
     const icons = getIcons();
-    const opts = ctx.options.model ?? {};
+    const opts = options ?? {};
 
     let modelName = ctx.model?.name || ctx.model?.id || "no-model";
     // Strip "Claude " prefix for brevity
@@ -79,11 +89,11 @@ const modelSegment: StatusLineSegment = {
   },
 };
 
-const pathSegment: StatusLineSegment = {
+const pathSegment: StatusLineSegment<PathSegmentOptions> = {
   id: "path",
-  render(ctx) {
+  render(ctx, options) {
     const icons = getIcons();
-    const opts = ctx.options.path ?? {};
+    const opts = options ?? {};
     const mode = opts.mode ?? "basename";
 
     let pwd = process.cwd();
@@ -117,14 +127,14 @@ const pathSegment: StatusLineSegment = {
   },
 };
 
-const gitSegment: StatusLineSegment = {
+const gitSegment: StatusLineSegment<GitSegmentOptions> = {
   id: "git",
-  render(ctx) {
+  render(ctx, options) {
     const icons = getIcons();
-    const opts = ctx.options.git ?? {};
+    const opts = options ?? {};
     const { branch, staged, unstaged, untracked } = ctx.git;
-    const gitStatus = (staged > 0 || unstaged > 0 || untracked > 0) 
-      ? { staged, unstaged, untracked } 
+    const gitStatus = (staged > 0 || unstaged > 0 || untracked > 0)
+      ? { staged, unstaged, untracked }
       : null;
 
     if (!branch && !gitStatus) return { content: "", visible: false };
@@ -308,11 +318,11 @@ const timeSpentSegment: StatusLineSegment = {
   },
 };
 
-const timeSegment: StatusLineSegment = {
+const timeSegment: StatusLineSegment<TimeSegmentOptions> = {
   id: "time",
-  render(ctx) {
+  render(ctx, options) {
     const icons = getIcons();
-    const opts = ctx.options.time ?? {};
+    const opts = options ?? {};
     const now = new Date();
 
     let hours = now.getHours();
@@ -418,7 +428,7 @@ const extensionStatusesSegment: StatusLineSegment = {
 // Segment Registry
 // ═══════════════════════════════════════════════════════════════════════════
 
-export const SEGMENTS: Record<StatusLineSegmentId, StatusLineSegment> = {
+export const BUILTIN_SEGMENTS: Record<BuiltinSegmentId, StatusLineSegment> = {
   pi: piSegment,
   model: modelSegment,
   path: pathSegment,
@@ -440,10 +450,3 @@ export const SEGMENTS: Record<StatusLineSegmentId, StatusLineSegment> = {
   extension_statuses: extensionStatusesSegment,
 };
 
-export function renderSegment(id: StatusLineSegmentId, ctx: SegmentContext): RenderedSegment {
-  const segment = SEGMENTS[id];
-  if (!segment) {
-    return { content: "", visible: false };
-  }
-  return segment.render(ctx);
-}
