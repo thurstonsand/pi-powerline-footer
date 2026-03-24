@@ -3,7 +3,10 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
 import type { NormalizedPowerlineSettings, PowerlineVibeSettings, StatusLinePreset } from "./types.js";
+import { normalizeCustomSettings } from "./custom.js";
+import { hasOwn, isRecord } from "./json.js";
 
+export const POWERLINE_PACKAGE_NAME = "pi-powerline-footer";
 export const LEGACY_POWERLINE_PROFILE_KEY = "modelProfiles";
 export const LEGACY_POWERLINE_SHORTCUTS_KEY = "powerlineShortcuts";
 export const LEGACY_POWERLINE_SHOW_LAST_PROMPT_KEY = "showLastPrompt";
@@ -19,10 +22,6 @@ export const LEGACY_POWERLINE_VIBE_KEYS = [
 
 export function getSettingsPath(): string {
   return join(getAgentDir(), "settings.json");
-}
-
-export function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 export function readSettings(logPrefix: string = "powerline-footer"): Record<string, unknown> {
@@ -178,8 +177,8 @@ export function normalizePowerlineSettings(rawSettings: Record<string, unknown>)
     settings.vibe = vibe;
   }
 
-  if (isRecord(powerline?.custom)) {
-    settings.custom = { ...powerline.custom };
+  if (powerline && hasOwn(powerline, "custom")) {
+    settings.custom = normalizeCustomSettings(powerline.custom);
   }
 
   return settings;
@@ -216,8 +215,8 @@ export function applyPowerlineSettings(
     delete nextPowerline.profiles;
   }
 
-  if (settings.custom && isRecord(settings.custom)) {
-    nextPowerline.custom = { ...settings.custom };
+  if (settings.custom !== undefined) {
+    nextPowerline.custom = isRecord(settings.custom) ? { ...settings.custom } : settings.custom;
   } else {
     delete nextPowerline.custom;
   }

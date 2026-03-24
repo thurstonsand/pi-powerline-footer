@@ -1,12 +1,12 @@
 import {
   LEGACY_POWERLINE_PROFILE_KEY,
-  isRecord,
   normalizePowerlineSettings,
   persistSettings,
   readSettings,
   readSettingsForWrite,
   updatePowerlineSettings,
 } from "./settings.js";
+import { isRecord } from "./json.js";
 
 export type ProfileThinkingLevel = "off" | "minimal" | "low" | "medium" | "high" | "xhigh";
 
@@ -133,23 +133,22 @@ export function findMatchingProfileIndex(
 }
 
 export function parseModelSpec(spec: string): { provider: string; modelId: string } | null {
-  const normalized = spec.trim();
-  const slashIndex = normalized.indexOf("/");
-  if (slashIndex <= 0 || slashIndex >= normalized.length - 1) {
+  const trimmed = spec.trim();
+  const slashIndex = trimmed.indexOf("/");
+  if (slashIndex <= 0 || slashIndex === trimmed.length - 1) {
     return null;
   }
 
-  const provider = normalized.slice(0, slashIndex).trim();
-  const modelId = normalized.slice(slashIndex + 1).trim();
-  if (!provider || !modelId) {
-    return null;
-  }
-
-  return { provider, modelId };
+  return {
+    provider: trimmed.slice(0, slashIndex),
+    modelId: trimmed.slice(slashIndex + 1),
+  };
 }
 
-export function getProfileDisplayName(profile: ProfileConfig, modelName?: string): string {
-  if (profile.label) return profile.label;
-  if (modelName) return modelName;
-  return parseModelSpec(profile.model)?.modelId ?? profile.model;
+export function getProfileDisplayName(profile: ProfileConfig, fallbackModelName: string): string {
+  if (profile.label?.trim()) {
+    return profile.label.trim();
+  }
+
+  return fallbackModelName;
 }

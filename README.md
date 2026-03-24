@@ -22,7 +22,7 @@ Customizes the default [pi](https://github.com/badlogic/pi-mono) editor with a p
 
 **Smart defaults** — Nerd Font auto-detection for iTerm, WezTerm, Kitty, Ghostty, and Alacritty with ASCII fallbacks. Colors matched to oh-my-pi's dark theme.
 
-**Git integration** — Async status fetching with 1s cache TTL. Automatically invalidates on file writes/edits. Shows branch, staged (+), unstaged (*), and untracked (?) counts.
+**Git integration** — Async status fetching with 1s cache TTL. Automatically invalidates on file writes/edits. Shows branch, staged (+), unstaged (\*), and untracked (?) counts.
 
 **Context awareness** — Color-coded warnings at 70% (yellow) and 90% (red) context usage. Auto-compact indicator when enabled.
 
@@ -40,14 +40,15 @@ Restart pi to activate.
 
 Activates automatically. Toggle with `/powerline`, switch presets with `/powerline <name>`.
 
-| Preset | Description |
-|--------|-------------|
+| Preset    | Description                                                  |
+| --------- | ------------------------------------------------------------ |
 | `default` | Model, thinking, path (basename), git, context, tokens, cost |
-| `minimal` | Just path (basename), git, context |
-| `compact` | Model, git, cost, context |
-| `full` | Everything including hostname, time, abbreviated path |
-| `nerd` | Maximum detail for Nerd Font users |
-| `ascii` | Safe for any terminal |
+| `minimal` | Just path (basename), git, context                           |
+| `compact` | Model, git, cost, context                                    |
+| `full`    | Everything including hostname, time, abbreviated path        |
+| `nerd`    | Maximum detail for Nerd Font users                           |
+| `ascii`   | Safe for any terminal                                        |
+| `custom`  | User-defined layout from `powerline.custom`                  |
 
 **Environment:** `POWERLINE_NERD_FONTS=1` to force Nerd Fonts, `=0` for ASCII.
 
@@ -73,16 +74,47 @@ The object form is now the preferred config shape.
 If you're upgrading from an older config, see **Migrate existing settings** at the end of this README.
 Run `/powerline default` to switch back to the default preset.
 
+### Custom preset
+
+`custom` resolves its layout from `powerline.custom` and uses the same layout path as the built-in presets.
+
+```json
+{
+  "powerline": {
+    "preset": "custom",
+    "custom": {
+      "separator": "powerline-thin",
+      "leftSegments": ["model", "path", "git"],
+      "rightSegments": ["time", "context_pct"],
+      "secondarySegments": ["extension_statuses"],
+      "options": {
+        "model": { "showThinkingLevel": true },
+        "path": { "mode": "abbreviated", "maxLength": 40 },
+        "git": {
+          "showBranch": true,
+          "showStaged": true,
+          "showUnstaged": true,
+          "showUntracked": true
+        },
+        "time": { "format": "12h", "showSeconds": false }
+      }
+    }
+  }
+}
+```
+
+Custom preset arrays use built-in segment ids from **Segments** below, and `separator` uses one of the names from **Separators**.
+
 ## Editor Stash
 
 Use `Alt+S` as a quick stash toggle while drafting. It keeps one active stash and clears the editor when stashing.
 
-| Editor | Stash | `Alt+S` result |
-|--------|-------|----------------|
-| Has text | Empty | Stash current text, clear editor |
-| Empty | Has stash | Restore stash into editor |
+| Editor   | Stash     | `Alt+S` result                               |
+| -------- | --------- | -------------------------------------------- |
+| Has text | Empty     | Stash current text, clear editor             |
+| Empty    | Has stash | Restore stash into editor                    |
 | Has text | Has stash | Update stash with current text, clear editor |
-| Empty | Empty | Show "Nothing to stash" |
+| Empty    | Empty     | Show "Nothing to stash"                      |
 
 Auto-restore after an agent run only happens when the editor is still empty. If you typed meanwhile, the stash is preserved.
 
@@ -132,7 +164,11 @@ Model profiles are saved model + thinking combinations stored in `~/.pi/agent/se
 {
   "powerline": {
     "profiles": [
-      { "model": "anthropic/claude-opus-4.6", "thinking": "xhigh", "label": "Opus Deep" },
+      {
+        "model": "anthropic/claude-opus-4.6",
+        "thinking": "xhigh",
+        "label": "Opus Deep"
+      },
       { "model": "openai/codex-5.3", "thinking": "low", "label": "Codex Fast" },
       { "model": "google/gemini-3-pro", "thinking": "medium" }
     ]
@@ -186,13 +222,13 @@ In `~/.pi/agent/settings.json`:
 {
   "powerline": {
     "vibe": {
-      "theme": "star trek",                               // Theme phrase
-      "mode": "generate",                                 // "generate" (on-demand) or "file" (pre-generated)
-      "model": "anthropic/claude-haiku-4-5",              // Optional: model to use (default)
-      "fallback": "Working",                              // Optional: fallback message
-      "refreshInterval": 30,                               // Optional: seconds between refreshes (default 30)
+      "theme": "star trek", // Theme phrase
+      "mode": "generate", // "generate" (on-demand) or "file" (pre-generated)
+      "model": "anthropic/claude-haiku-4-5", // Optional: model to use (default)
+      "fallback": "Working", // Optional: fallback message
+      "refreshInterval": 30, // Optional: seconds between refreshes (default 30)
       "prompt": "Generate a {theme} loading message for: {task}",
-      "maxLength": 65                                      // Optional: max message length (default 65)
+      "maxLength": 65 // Optional: max message length (default 65)
     }
   }
 }
@@ -200,12 +236,13 @@ In `~/.pi/agent/settings.json`:
 
 ### Modes
 
-| Mode | Description | Pros | Cons |
-|------|-------------|------|------|
-| `generate` | On-demand AI generation (default) | Contextual, hints at actual task | ~$0.000015/msg, 500ms latency |
-| `file` | Pull from pre-generated file | Instant, zero cost, works offline | Not contextual |
+| Mode       | Description                       | Pros                              | Cons                          |
+| ---------- | --------------------------------- | --------------------------------- | ----------------------------- |
+| `generate` | On-demand AI generation (default) | Contextual, hints at actual task  | ~$0.000015/msg, 500ms latency |
+| `file`     | Pull from pre-generated file      | Instant, zero cost, works offline | Not contextual                |
 
 **File mode setup:**
+
 ```bash
 /vibe generate mafia 200    # Generate 200 vibes, save to ~/.pi/agent/vibes/mafia.txt
 /vibe mode file             # Switch to file mode
@@ -213,17 +250,20 @@ In `~/.pi/agent/settings.json`:
 ```
 
 **How file mode works:**
+
 1. Vibes are loaded from `~/.pi/agent/vibes/{theme}.txt` into memory
 2. Uses seeded shuffle (Mulberry32 PRNG) — cycles through all vibes before repeating
 3. New seed each session — different order every time you restart pi
 4. Zero latency, zero cost, works offline
 
 **Prompt template variables (generate mode only):**
+
 - `{theme}` — the current vibe theme (e.g., "star trek", "mafia")
 - `{task}` — context hint (user prompt initially, then agent's response text or tool info on refresh)
 - `{exclude}` — recent vibes to avoid (auto-populated, e.g., "Don't use: vibe1, vibe2...")
 
 **How it works:**
+
 1. When you send a message, shows "Channeling {theme}..." placeholder
 2. AI generates a themed message in the background (3s timeout)
 3. Message updates to the themed version (e.g., "Engaging warp drive...")
@@ -234,24 +274,24 @@ In `~/.pi/agent/settings.json`:
 
 The thinking segment shows live updates when you change thinking level:
 
-| Level | Display | Color |
-|-------|---------|-------|
-| off | `thinking:off` | gray |
-| minimal | `thinking:min` | purple-gray |
-| low | `thinking:low` | blue |
-| medium | `thinking:med` | teal |
-| high | `thinking:high` | 🌈 rainbow |
-| xhigh | `thinking:xhigh` | 🌈 rainbow |
+| Level   | Display          | Color       |
+| ------- | ---------------- | ----------- |
+| off     | `thinking:off`   | gray        |
+| minimal | `thinking:min`   | purple-gray |
+| low     | `thinking:low`   | blue        |
+| medium  | `thinking:med`   | teal        |
+| high    | `thinking:high`  | 🌈 rainbow  |
+| xhigh   | `thinking:xhigh` | 🌈 rainbow  |
 
 ## Path Display
 
 The path segment supports three modes:
 
-| Mode | Example | Description |
-|------|---------|-------------|
-| `basename` | `powerline-footer` | Just the directory name (default) |
-| `abbreviated` | `…/extensions/powerline-footer` | Full path with home abbreviated and length limit |
-| `full` | `~/.pi/agent/extensions/powerline-footer` | Complete path with home abbreviated |
+| Mode          | Example                                   | Description                                      |
+| ------------- | ----------------------------------------- | ------------------------------------------------ |
+| `basename`    | `powerline-footer`                        | Just the directory name (default)                |
+| `abbreviated` | `…/extensions/powerline-footer`           | Full path with home abbreviated and length limit |
+| `full`        | `~/.pi/agent/extensions/powerline-footer` | Complete path with home abbreviated              |
 
 Configure via preset options: `path: { mode: "full" }`
 
@@ -269,19 +309,19 @@ Colors are configurable via pi's theme system. Each preset defines its own color
 
 ### Default Colors
 
-| Semantic | Theme Color | Description |
-|----------|-------------|-------------|
-| `pi` | `accent` | Pi icon |
-| `model` | `#d787af` | Model name |
-| `path` | `#00afaf` | Directory path |
-| `gitClean` | `success` | Git branch (clean) |
-| `gitDirty` | `warning` | Git branch (dirty) |
-| `thinking` | `muted` | Thinking level |
-| `context` | `dim` | Context usage |
-| `contextWarn` | `warning` | Context usage >70% |
-| `contextError` | `error` | Context usage >90% |
-| `cost` | `text` | Cost display |
-| `tokens` | `muted` | Token counts |
+| Semantic       | Theme Color | Description        |
+| -------------- | ----------- | ------------------ |
+| `pi`           | `accent`    | Pi icon            |
+| `model`        | `#d787af`   | Model name         |
+| `path`         | `#00afaf`   | Directory path     |
+| `gitClean`     | `success`   | Git branch (clean) |
+| `gitDirty`     | `warning`   | Git branch (dirty) |
+| `thinking`     | `muted`     | Thinking level     |
+| `context`      | `dim`       | Context usage      |
+| `contextWarn`  | `warning`   | Context usage >70% |
+| `contextError` | `error`     | Context usage >90% |
+| `cost`         | `text`      | Cost display       |
+| `tokens`       | `muted`     | Token counts       |
 
 ### Custom Theme Override
 
@@ -299,6 +339,7 @@ Create `~/.pi/agent/extensions/powerline-footer/theme.json`:
 ```
 
 Colors can be:
+
 - **Theme color names**: `accent`, `muted`, `dim`, `text`, `success`, `warning`, `error`, `border`, `borderAccent`, `borderMuted`
 - **Hex colors**: `#ff5500`, `#d787af`
 
@@ -322,7 +363,11 @@ Before:
     "profileSelect": "ctrl+alt+m"
   },
   "modelProfiles": [
-    { "model": "anthropic/claude-opus-4.6", "thinking": "xhigh", "label": "Opus Deep" }
+    {
+      "model": "anthropic/claude-opus-4.6",
+      "thinking": "xhigh",
+      "label": "Opus Deep"
+    }
   ],
   "workingVibe": "star trek",
   "workingVibeMode": "generate",
@@ -349,7 +394,11 @@ After:
       "profileSelect": "ctrl+alt+m"
     },
     "profiles": [
-      { "model": "anthropic/claude-opus-4.6", "thinking": "xhigh", "label": "Opus Deep" }
+      {
+        "model": "anthropic/claude-opus-4.6",
+        "thinking": "xhigh",
+        "label": "Opus Deep"
+      }
     ],
     "vibe": {
       "theme": "star trek",

@@ -67,6 +67,8 @@ export type StatusLinePreset =
   | "ascii"
   | "custom";
 
+export type BuiltinStatusLinePreset = Exclude<StatusLinePreset, "custom">;
+
 // Per-segment options
 export interface StatusLineSegmentOptions {
   model?: { showThinkingLevel?: boolean };
@@ -88,13 +90,27 @@ export interface PowerlineVibeSettings {
   maxLength?: number;
 }
 
+export interface NormalizedCustomPresetSettings {
+  separator: StatusLineSeparatorStyle;
+  leftSegments: StatusLineSegmentId[];
+  rightSegments: StatusLineSegmentId[];
+  secondarySegments: StatusLineSegmentId[];
+  options: StatusLineSegmentOptions;
+}
+
+export interface ResolvedPresetDef {
+  preset: StatusLinePreset;
+  definition: PresetDef;
+  error?: string;
+}
+
 export interface NormalizedPowerlineSettings {
   preset?: StatusLinePreset;
   showLastPrompt?: boolean;
   shortcuts?: Record<string, unknown>;
   profiles?: unknown[];
   vibe?: PowerlineVibeSettings;
-  custom?: Record<string, unknown>;
+  custom?: unknown;
 }
 
 // Preset definition
