@@ -17,6 +17,7 @@ import type {
   ResolvedPresetDef,
   SegmentContext,
   StatusLinePreset,
+  StatusLineSegment,
   StatusLineSegmentId,
 } from "./types.js";
 import { PRESET_NAMES, resolvePresetDefinition } from "./presets.js";
@@ -70,6 +71,10 @@ import {
 // ═══════════════════════════════════════════════════════════════════════════
 // Configuration
 // ═══════════════════════════════════════════════════════════════════════════
+
+export interface SegmentLoaderAPI {
+  registerSegment<TOptions = unknown>(segment: StatusLineSegment<TOptions>): StatusLineSegment<TOptions>;
+}
 
 interface PowerlineConfig {
   settings: PowerlineSettings;
@@ -2138,4 +2143,10 @@ export default function powerlineFooter(pi: ExtensionAPI) {
 }
 
 export { registerSegment } from "./segment-registry.js";
-export type { RenderedSegment, SegmentContext, StatusLineSegment } from "./types.js";
+export type {
+  RenderedSegment,
+  SegmentContext,
+  StatusLineSegment,
+  StatusLineSegmentId,
+  StatusLineSegmentOptions,
+} from "./types.js";
