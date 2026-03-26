@@ -39,7 +39,10 @@ import {
 import { getSeparator } from "./separators.js";
 import { installPowerlineAutocompleteBridge } from "./autocomplete-bridge.js";
 import { createAutocompleteRegistry } from "./autocomplete-registry.js";
-import { installRuntimeAutocompleteEnhancerIntegration } from "./autocomplete-runtime.js";
+import {
+  getVisiblePowerlineAutocompleteHint,
+  installRuntimeAutocompleteEnhancerIntegration,
+} from "./autocomplete-runtime.js";
 import { ansi, getFgAnsiCode } from "./colors.js";
 import { getGitStatus, invalidateGitStatus, invalidateGitBranch } from "./git-status.js";
 import {
@@ -1158,6 +1161,7 @@ export default function powerlineFooter(pi: ExtensionAPI) {
           ctx.ui.setEditorComponent(undefined);
           ctx.ui.setFooter(undefined);
           ctx.ui.setHeader(undefined);
+          ctx.ui.setWidget("powerline-autocomplete-hint", undefined);
           ctx.ui.setWidget("powerline-secondary", undefined);
           ctx.ui.setWidget("powerline-status", undefined);
           ctx.ui.setWidget("powerline-last-prompt", undefined);
@@ -1802,6 +1806,22 @@ export default function powerlineFooter(pi: ExtensionAPI) {
           },
         };
       });
+
+      ctx.ui.setWidget("powerline-autocomplete-hint", (_tui: any, theme: Theme) => {
+        return {
+          dispose() {},
+          invalidate() {},
+          render(width: number): string[] {
+            const hint = getVisiblePowerlineAutocompleteHint(currentEditor);
+            if (!hint || width < 2) {
+              return [];
+            }
+
+            const text = truncateWithEllipsisByWidth(hint, width - 1);
+            return [` ${theme.fg("muted", text)}`];
+          },
+        };
+      }, { placement: "belowEditor" });
 
       // Set up secondary row as a widget below editor (above sub bar)
       // Shows overflow segments when top bar is too narrow

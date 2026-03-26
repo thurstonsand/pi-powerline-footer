@@ -1,12 +1,16 @@
 import type {
   AutocompleteItem,
   AutocompleteProvider,
+  Editor,
 } from "@mariozechner/pi-tui";
 import { describe, expect, test } from "vitest";
 
 import { createAutocompleteRegistry } from "./autocomplete-registry.js";
 import {
   createRuntimeAutocompleteProvider,
+  getVisiblePowerlineAutocompleteHint,
+  installRuntimeAutocompleteEnhancerIntegration,
+  type PowerlineAutocompleteHintEditor,
   type PowerlineAutocompleteSuggestions,
   type PowerlineRuntimeAutocompleteProvider,
 } from "./autocomplete-runtime.js";
@@ -56,6 +60,24 @@ function wrapProvider(baseProvider: AutocompleteProvider, suffix: string): Autoc
       };
     },
   };
+}
+
+class FakeRuntimeEditor implements PowerlineAutocompleteHintEditor {
+  autocompleteProvider?: PowerlineRuntimeAutocompleteProvider;
+  getPowerlineAutocompleteHint?: () => string | undefined;
+  private showingAutocomplete = false;
+
+  setAutocompleteProvider(provider: AutocompleteProvider): void {
+    this.autocompleteProvider = provider as PowerlineRuntimeAutocompleteProvider;
+  }
+
+  isShowingAutocomplete(): boolean {
+    return this.showingAutocomplete;
+  }
+
+  setShowingAutocomplete(value: boolean): void {
+    this.showingAutocomplete = value;
+  }
 }
 
 describe("runtime autocomplete provider", () => {
@@ -111,7 +133,7 @@ describe("runtime autocomplete provider", () => {
     expect(trace).toEqual(["always", "sessions", "always", "hash", "always"]);
   });
 
-  test("preserves Pi file-completion methods when enhancers only wrap suggestions", () => {
+  test("preserves Pi file-completion methods and base hint when enhancers only wrap suggestions", () => {
     const registry = createAutocompleteRegistry();
 
     registry.upsertHostedEnhancer("sessions", {
@@ -122,7 +144,12 @@ describe("runtime autocomplete provider", () => {
       },
     });
 
-    const provider = createRuntimeAutocompleteProvider(createRuntimeBaseProvider(), registry);
+    const provider = createRuntimeAutocompleteProvider({
+      ...createRuntimeBaseProvider(),
+      getPowerlineAutocompleteHint() {
+        return "base hint";
+      },
+    }, registry);
     const line = "open @session";
 
     expect(provider.getSuggestions([line], 0, line.length)?.prefix).toBe("@session|sessions");
@@ -131,5 +158,56 @@ describe("runtime autocomplete provider", () => {
       prefix: "",
     });
     expect(provider.shouldTriggerFileCompletion?.([""], 0, 0)).toBe(false);
+    expect(provider.getPowerlineAutocompleteHint?.()).toBe("base hint");
+  });
+
+  test("shows hints only while autocomplete is visible", () => {
+    const editor = new FakeRuntimeEditor();
+
+    editor.getPowerlineAutocompleteHint = () => "hidden";
+    expect(getVisiblePowerlineAutocompleteHint(editor)).toBeUndefined();
+
+    editor.setShowingAutocomplete(true);
+    expect(getVisiblePowerlineAutocompleteHint(editor)).toBe("hidden");
+
+    editor.getPowerlineAutocompleteHint = () => "   ";
+    expect(getVisiblePowerlineAutocompleteHint(editor)).toBeUndefined();
+  });
+
+  test("tracks provider-derived hint updates through the editor integration", () => {
+    const registry = createAutocompleteRegistry();
+    const editor = new FakeRuntimeEditor();
+    let hint = "Ctrl+A: show all sessions";
+
+    registry.upsertHostedEnhancer("sessions", {
+      id: "sessions",
+      trigger: { prefixes: ["@session", "@session:"] },
+      enhance(baseProvider) {
+        return {
+          ...wrapProvider(baseProvider, "sessions"),
+          getPowerlineAutocompleteHint() {
+            return hint;
+          },
+        };
+      },
+    });
+
+    installRuntimeAutocompleteEnhancerIntegration(editor as unknown as Editor, registry);
+    editor.setAutocompleteProvider(createRuntimeBaseProvider());
+    editor.setShowingAutocomplete(true);
+
+    const sessionLine = "open @session:abc";
+    expect(editor.autocompleteProvider?.getSuggestions([sessionLine], 0, sessionLine.length)?.prefix).toBe("@session:abc|sessions");
+    expect(getVisiblePowerlineAutocompleteHint(editor)).toBe("Ctrl+A: show all sessions");
+
+    hint = "Ctrl+A: show only direct lineage";
+    expect(getVisiblePowerlineAutocompleteHint(editor)).toBe("Ctrl+A: show only direct lineage");
+
+    const plainLine = "open plain";
+    expect(editor.autocompleteProvider?.getSuggestions([plainLine], 0, plainLine.length)?.prefix).toBe("plain");
+    expect(getVisiblePowerlineAutocompleteHint(editor)).toBeUndefined();
+
+    editor.setShowingAutocomplete(false);
+    expect(getVisiblePowerlineAutocompleteHint(editor)).toBeUndefined();
   });
 });

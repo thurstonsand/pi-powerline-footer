@@ -202,6 +202,8 @@ export default function myExtension(pi) {
 
 Powerline hosts the enhancer registry and re-wraps pi's base autocomplete provider, so load order is safe and native file/slash completion stays intact.
 
+Enhancers can also return an optional `getPowerlineAutocompleteHint()` method on the wrapped provider. Powerline renders that hint below the editor only while Pi's autocomplete list is visible.
+
 ## Editor Stash
 
 Use `Alt+S` as a quick stash toggle while drafting. It keeps one active stash and clears the editor when stashing.
