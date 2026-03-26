@@ -1,12 +1,9 @@
 import type { AutocompleteItem, AutocompleteProvider } from "@mariozechner/pi-tui";
-import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
+import { describe, expect, test, vi } from "vitest";
 
 import {
-  getRegisteredAutocompleteEnhancers,
-  registerAutocompleteEnhancer,
-  resetAutocompleteEnhancersForTests,
+  createAutocompleteRegistry,
   shouldActivateAutocompleteEnhancer,
-  unregisterAutocompleteEnhancer,
 } from "./autocomplete-registry.js";
 
 function createProvider(label: string): AutocompleteProvider {
@@ -21,42 +18,37 @@ function createProvider(label: string): AutocompleteProvider {
 }
 
 describe("autocomplete enhancer registry", () => {
-  beforeEach(() => {
-    resetAutocompleteEnhancersForTests();
-  });
-
-  afterEach(() => {
-    resetAutocompleteEnhancersForTests();
-  });
-
-  test("package root re-exports autocomplete registration helpers", async () => {
+  test("package root re-exports autocomplete bridge helpers", async () => {
     const root = await import("./index.js");
 
-    expect(root.registerAutocompleteEnhancer).toBe(registerAutocompleteEnhancer);
-    expect(root.unregisterAutocompleteEnhancer).toBe(unregisterAutocompleteEnhancer);
+    expect(root.connectPowerlineAutocompleteExtension).toBeTypeOf("function");
+    expect(root.POWERLINE_AUTOCOMPLETE_EVENTS).toBeDefined();
+    expect(root.POWERLINE_AUTOCOMPLETE_PROTOCOL_VERSION).toBe(1);
   });
 
-  test("re-registering the same id replaces the enhancer in place", () => {
-    registerAutocompleteEnhancer({
+  test("re-registering the same extension and id replaces the enhancer in place", () => {
+    const registry = createAutocompleteRegistry();
+
+    registry.upsertHostedEnhancer("pi-sessions", {
       id: "sessions",
       enhance() {
         return createProvider("old");
       },
     });
-    registerAutocompleteEnhancer({
+    registry.upsertHostedEnhancer("pi-files", {
       id: "files",
       enhance() {
         return createProvider("files");
       },
     });
-    registerAutocompleteEnhancer({
+    registry.upsertHostedEnhancer("pi-sessions", {
       id: "sessions",
       enhance() {
         return createProvider("new");
       },
     });
 
-    const enhancers = getRegisteredAutocompleteEnhancers();
+    const enhancers = registry.getRegisteredEnhancers();
 
     expect(enhancers.map((enhancer) => enhancer.id)).toEqual(["sessions", "files"]);
     expect(enhancers[0]?.enhance(createProvider("base")).getSuggestions([], 0, 0)).toEqual({
@@ -65,24 +57,44 @@ describe("autocomplete enhancer registry", () => {
     });
   });
 
-  test("applies enhancers in stable registration order", () => {
+  test("different extensions can contribute the same enhancer id", () => {
+    const registry = createAutocompleteRegistry();
+
+    registry.upsertHostedEnhancer("alpha", {
+      id: "sessions",
+      enhance() {
+        return createProvider("alpha");
+      },
+    });
+    registry.upsertHostedEnhancer("beta", {
+      id: "sessions",
+      enhance() {
+        return createProvider("beta");
+      },
+    });
+
+    expect(registry.getRegisteredEnhancers().map((enhancer) => enhancer.id)).toEqual(["sessions", "sessions"]);
+  });
+
+  test("applies enhancers in stable host order", () => {
+    const registry = createAutocompleteRegistry();
     const trace: string[] = [];
 
-    registerAutocompleteEnhancer({
+    registry.upsertHostedEnhancer("alpha", {
       id: "alpha",
       enhance(baseProvider) {
         trace.push(`enhance:${baseProvider.getSuggestions([], 0, 0)?.prefix ?? "none"}->alpha`);
         return createProvider("alpha");
       },
     });
-    registerAutocompleteEnhancer({
+    registry.upsertHostedEnhancer("beta", {
       id: "beta",
       enhance(baseProvider) {
         trace.push(`enhance:${baseProvider.getSuggestions([], 0, 0)?.prefix ?? "none"}->beta`);
         return createProvider("beta");
       },
     });
-    registerAutocompleteEnhancer({
+    registry.upsertHostedEnhancer("gamma", {
       id: "gamma",
       enhance(baseProvider) {
         trace.push(`enhance:${baseProvider.getSuggestions([], 0, 0)?.prefix ?? "none"}->gamma`);
@@ -90,7 +102,7 @@ describe("autocomplete enhancer registry", () => {
       },
     });
 
-    const finalProvider = getRegisteredAutocompleteEnhancers().reduce(
+    const finalProvider = registry.getRegisteredEnhancers().reduce(
       (provider, enhancer) => enhancer.enhance(provider),
       createProvider("base"),
     );
@@ -103,28 +115,60 @@ describe("autocomplete enhancer registry", () => {
     expect(finalProvider.getSuggestions([], 0, 0)?.prefix).toBe("gamma");
   });
 
-  test("unregister removes enhancers cleanly", () => {
-    registerAutocompleteEnhancer({
+  test("removeHostedEnhancer removes contributions cleanly", () => {
+    const registry = createAutocompleteRegistry();
+
+    registry.upsertHostedEnhancer("pi-sessions", {
       id: "sessions",
       enhance(baseProvider) {
         return baseProvider;
       },
     });
-    registerAutocompleteEnhancer({
+    registry.upsertHostedEnhancer("pi-files", {
       id: "files",
       enhance(baseProvider) {
         return baseProvider;
       },
     });
 
-    unregisterAutocompleteEnhancer("sessions");
-    unregisterAutocompleteEnhancer("missing");
+    registry.removeHostedEnhancer("pi-sessions", "sessions");
+    registry.removeHostedEnhancer("pi-sessions", "missing");
 
-    expect(getRegisteredAutocompleteEnhancers().map((enhancer) => enhancer.id)).toEqual(["files"]);
+    expect(registry.getRegisteredEnhancers().map((enhancer) => enhancer.id)).toEqual(["files"]);
+  });
+
+  test("subscribe fires on add replace and remove", () => {
+    const registry = createAutocompleteRegistry();
+    const listener = vi.fn();
+    const unsubscribe = registry.subscribe(listener);
+
+    registry.upsertHostedEnhancer("pi-sessions", {
+      id: "sessions",
+      enhance(baseProvider) {
+        return baseProvider;
+      },
+    });
+    registry.upsertHostedEnhancer("pi-sessions", {
+      id: "sessions",
+      enhance(baseProvider) {
+        return baseProvider;
+      },
+    });
+    registry.removeHostedEnhancer("pi-sessions", "sessions");
+    unsubscribe();
+    registry.upsertHostedEnhancer("pi-sessions", {
+      id: "sessions",
+      enhance(baseProvider) {
+        return baseProvider;
+      },
+    });
+
+    expect(listener).toHaveBeenCalledTimes(3);
   });
 
   test("prefix triggers activate only when the cursor token matches", () => {
-    const enhancer = registerAutocompleteEnhancer({
+    const registry = createAutocompleteRegistry();
+    const entry = registry.upsertHostedEnhancer("pi-sessions", {
       id: "sessions",
       trigger: {
         prefixes: ["@session", "@session:"],
@@ -135,14 +179,14 @@ describe("autocomplete enhancer registry", () => {
     });
 
     expect(shouldActivateAutocompleteEnhancer(
-      enhancer,
+      entry.enhancer,
       ["inspect @session:1a794629"],
       0,
       "inspect @session:1a794629".length,
     )).toBe(true);
 
     expect(shouldActivateAutocompleteEnhancer(
-      enhancer,
+      entry.enhancer,
       ["inspect session:1a794629"],
       0,
       "inspect session:1a794629".length,
@@ -150,11 +194,12 @@ describe("autocomplete enhancer registry", () => {
   });
 
   test("shouldActivate uses the custom trigger predicate result", () => {
+    const registry = createAutocompleteRegistry();
     const shouldActivate = vi.fn((lines: string[], cursorLine: number, cursorCol: number) => {
       return lines[cursorLine]?.slice(0, cursorCol).includes("#session") ?? false;
     });
 
-    const enhancer = registerAutocompleteEnhancer({
+    const entry = registry.upsertHostedEnhancer("pi-hash", {
       id: "hash-sessions",
       trigger: {
         shouldActivate,
@@ -164,8 +209,8 @@ describe("autocomplete enhancer registry", () => {
       },
     });
 
-    expect(shouldActivateAutocompleteEnhancer(enhancer, ["open #session"], 0, "open #session".length)).toBe(true);
-    expect(shouldActivateAutocompleteEnhancer(enhancer, ["open @session"], 0, "open @session".length)).toBe(false);
+    expect(shouldActivateAutocompleteEnhancer(entry.enhancer, ["open #session"], 0, "open #session".length)).toBe(true);
+    expect(shouldActivateAutocompleteEnhancer(entry.enhancer, ["open @session"], 0, "open @session".length)).toBe(false);
     expect(shouldActivate).toHaveBeenCalledWith(["open #session"], 0, "open #session".length);
     expect(shouldActivate).toHaveBeenCalledWith(["open @session"], 0, "open @session".length);
   });

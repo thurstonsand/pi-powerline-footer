@@ -2,7 +2,13 @@
 
 ## [Unreleased]
 
+### Added
+- **Cross-extension autocomplete bridge** — Powerline now lets other extensions contribute autocomplete enhancers over `pi.events` without competing for editor ownership. The package root exports `connectPowerlineAutocompleteExtension(...)`, protocol constants, and enhancer types for extension authors.
+- **Load-order-safe autocomplete handshake** — External extensions and Powerline recover cleanly regardless of which loads first by combining a scoped ping/reply RPC with a `powerline:autocomplete:ready` broadcast.
+- **Bridge and runtime coverage** — Added tests for hosted enhancer registry behavior, bridge registration/replay/unregister flows, and runtime provider wrapping across matching enhancers.
+
 ### Changed
+- **Autocomplete composition is now host-owned** — Powerline keeps the authoritative autocomplete registry and refreshes the wrapped provider when hosted enhancers change, instead of relying on cross-extension shared module state.
 - **Nested `powerline` config is now first-class** — Settings can now be organized under `powerline` as an object, including `preset`, `showLastPrompt`, `shortcuts`, `profiles`, and `vibe`. The legacy top-level keys still load as fallback, but the nested shape is now the preferred configuration model.
 - **Settings writes now preserve nested config** — Commands like `/powerline`, `/vibe`, and `/model-switcher` now update the nested `powerline` object instead of flattening or overwriting adjacent config.
 - **`custom` preset now resolves from `powerline.custom`** — The old static `custom` layout has been replaced by a settings-driven preset that flows through the same preset/layout path as the built-in presets. Missing or non-object `powerline.custom` now shows an explicit inline/UI error; other custom values defer to existing runtime fallback behavior.

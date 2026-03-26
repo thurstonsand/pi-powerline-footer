@@ -39,15 +39,18 @@ import {
   updatePowerlineSettings,
 } from "./settings.js";
 import { getSeparator } from "./separators.js";
+import { installPowerlineAutocompleteBridge } from "./autocomplete-bridge.js";
+import { createAutocompleteRegistry } from "./autocomplete-registry.js";
+import { installRuntimeAutocompleteEnhancerIntegration } from "./autocomplete-runtime.js";
+import { ansi, getFgAnsiCode } from "./colors.js";
+import { getGitStatus, invalidateGitStatus, invalidateGitBranch } from "./git-status.js";
 import {
   getCustomSegmentLoadErrors,
   loadSegmentsFromDirectory,
   renderSegment,
 } from "./segment-registry.js";
-import { getGitStatus, invalidateGitStatus, invalidateGitBranch } from "./git-status.js";
-import { ansi, getFgAnsiCode } from "./colors.js";
-import { WelcomeComponent, WelcomeHeader, discoverLoadedCounts, getRecentSessions } from "./welcome.js";
 import { getDefaultColors } from "./theme.js";
+import { WelcomeComponent, WelcomeHeader, discoverLoadedCounts, getRecentSessions } from "./welcome.js";
 import { 
   initVibeManager, 
   onVibeBeforeAgentStart, 
@@ -531,6 +534,8 @@ function computeResponsiveLayout(
 // ═══════════════════════════════════════════════════════════════════════════
 
 export default function powerlineFooter(pi: ExtensionAPI) {
+  const autocompleteRegistry = createAutocompleteRegistry();
+  const disposeAutocompleteBridge = installPowerlineAutocompleteBridge(pi.events, autocompleteRegistry);
   const rawSettings = readSettings("powerline-footer");
   const resolvedShortcuts = resolveShortcutConfig(normalizePowerlineSettings(rawSettings));
 
@@ -1165,6 +1170,10 @@ export default function powerlineFooter(pi: ExtensionAPI) {
     reloadAndSyncActiveProfile(ctx);
   });
 
+  pi.on("session_shutdown", async () => {
+    disposeAutocompleteBridge();
+  });
+
   // Command to toggle/configure
   pi.registerCommand("powerline", {
     description: "Configure powerline status (toggle, preset)",
@@ -1710,6 +1719,13 @@ export default function powerlineFooter(pi: ExtensionAPI) {
         currentEditor = editor;
         trackPromptHistory(editor);
         restorePromptHistory(editor);
+
+        installRuntimeAutocompleteEnhancerIntegration(editor, autocompleteRegistry, {
+          onError: (message, error) => {
+            console.error(`[powerline-footer] ${message}`, error);
+            ctx.ui.notify(message, "error");
+          },
+        });
         
         const originalHandleInput = editor.handleInput.bind(editor);
         editor.handleInput = (data: string) => {
@@ -2012,9 +2028,10 @@ export default function powerlineFooter(pi: ExtensionAPI) {
 }
 
 export {
-  registerAutocompleteEnhancer,
-  unregisterAutocompleteEnhancer,
-} from "./autocomplete-registry.js";
+  connectPowerlineAutocompleteExtension,
+  POWERLINE_AUTOCOMPLETE_EVENTS,
+  POWERLINE_AUTOCOMPLETE_PROTOCOL_VERSION,
+} from "./autocomplete-bridge.js";
 export { registerSegment } from "./segment-registry.js";
 export type {
   PowerlineAutocompleteEnhancer,
@@ -2025,3 +2042,12 @@ export type {
   StatusLineSegmentId,
   StatusLineSegmentOptions,
 } from "./types.js";
+export type {
+  PowerlineAutocompleteBridgeDebugEvent,
+  PowerlineAutocompleteExtensionConnection,
+  PowerlineAutocompleteExtensionIdentity,
+  PowerlineAutocompletePingRequest,
+  PowerlineAutocompleteRegisterRequest,
+  PowerlineAutocompleteRpcReply,
+  PowerlineAutocompleteUnregisterRequest,
+} from "./autocomplete-bridge.js";

@@ -199,6 +199,73 @@ A single entrypoint can register as many segments as it wants.
 
 If you want to register a segment from code instead of disk, import `registerSegment()` from `pi-powerline-footer` and use the same registration shape.
 
+## Autocomplete bridge for other extensions
+
+Powerline owns the editor when enabled, but other extensions can now add autocomplete behavior without replacing the editor.
+
+Current supported path: **external extensions connect over `pi.events`**.
+
+The package root exports:
+
+- `connectPowerlineAutocompleteExtension(...)`
+- `POWERLINE_AUTOCOMPLETE_EVENTS`
+- `POWERLINE_AUTOCOMPLETE_PROTOCOL_VERSION`
+- `PowerlineAutocompleteEnhancer`
+- `PowerlineAutocompleteEnhancerTrigger`
+
+Example:
+
+```ts
+import {
+  connectPowerlineAutocompleteExtension,
+  type PowerlineAutocompleteEnhancer,
+} from "pi-powerline-footer";
+
+const enhancers: PowerlineAutocompleteEnhancer[] = [
+  {
+    id: "session-handoff",
+    trigger: { prefixes: ["@session", "@session:"] },
+    enhance(baseProvider) {
+      return {
+        getSuggestions(lines, cursorLine, cursorCol) {
+          const base = baseProvider.getSuggestions(lines, cursorLine, cursorCol);
+          return {
+            prefix: "@session",
+            items: [
+              { value: "@session:abc123", label: "@session:abc123", description: "handoff target" },
+              ...(base?.items ?? []),
+            ],
+          };
+        },
+        applyCompletion: baseProvider.applyCompletion.bind(baseProvider),
+      };
+    },
+  },
+];
+
+export default function myExtension(pi) {
+  const disconnect = connectPowerlineAutocompleteExtension(pi.events, {
+    extension: { id: "my-extension", version: "1.0.0" },
+    enhancers,
+  });
+
+  pi.on("session_shutdown", async () => {
+    disconnect();
+  });
+}
+```
+
+How it works:
+
+- your extension pings Powerline over `pi.events`
+- Powerline replies and hosts your enhancer in its internal registry
+- Powerline re-wraps Pi's base autocomplete provider
+- `ready` broadcasts allow either load order to recover cleanly after startup or reload
+
+This keeps Pi's native autocomplete UI and file/slash completion behavior intact while letting external extensions layer custom provider logic on top.
+
+**Current scope:** cross-extension autocomplete over `pi.events` is supported now. File-based local autocomplete entrypoints under `~/.pi/agent/powerline/autocomplete/` are planned later and are not part of the current release surface.
+
 #### Custom segment TypeScript API
 
 For typed custom segments, the package root exports:
