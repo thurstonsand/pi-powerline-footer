@@ -1,4 +1,5 @@
 import type { Theme, ThemeColor } from "@mariozechner/pi-coding-agent";
+import type { AutocompleteProvider } from "@mariozechner/pi-tui";
 
 // Theme color - either a pi theme color name or a custom hex color
 export type ColorValue = ThemeColor | `#${string}`;
@@ -198,4 +199,15 @@ export interface RenderedSegment {
 export interface StatusLineSegment<TOptions = unknown> {
   id: StatusLineSegmentId;
   render(ctx: SegmentContext, options?: TOptions): RenderedSegment;
+}
+
+export interface PowerlineAutocompleteEnhancerTrigger {
+  prefixes?: string[];
+  shouldActivate?(lines: string[], cursorLine: number, cursorCol: number): boolean;
+}
+
+export interface PowerlineAutocompleteEnhancer {
+  id: string;
+  trigger?: PowerlineAutocompleteEnhancerTrigger;
+  enhance(baseProvider: AutocompleteProvider): AutocompleteProvider;
 }

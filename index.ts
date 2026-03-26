@@ -2011,8 +2011,14 @@ export default function powerlineFooter(pi: ExtensionAPI) {
   }
 }
 
+export {
+  registerAutocompleteEnhancer,
+  unregisterAutocompleteEnhancer,
+} from "./autocomplete-registry.js";
 export { registerSegment } from "./segment-registry.js";
 export type {
+  PowerlineAutocompleteEnhancer,
+  PowerlineAutocompleteEnhancerTrigger,
   RenderedSegment,
   SegmentContext,
   StatusLineSegment,
