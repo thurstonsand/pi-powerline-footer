@@ -1981,7 +1981,13 @@ export default function powerlineFooter(pi: ExtensionAPI) {
 
 // Public types for file-based custom segment entrypoints.
 export type { SegmentLoaderAPI } from "./segment-registry.js";
+export {
+  registerAutocompleteEnhancer,
+  unregisterAutocompleteEnhancer,
+} from "./autocomplete-registry.js";
 export type {
+  PowerlineAutocompleteEnhancer,
+  PowerlineAutocompleteEnhancerTrigger,
   RenderedSegment,
   SegmentContext,
   StatusLineSegment,
