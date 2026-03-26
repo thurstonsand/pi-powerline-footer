@@ -146,6 +146,62 @@ export default function ({ registerSegment }) {
 }
 ```
 
+## Autocomplete bridge for other extensions
+
+Powerline owns the editor when enabled, but other extensions can add autocomplete behavior over `pi.events`.
+
+The package root exports:
+
+- `connectPowerlineAutocompleteExtension(...)`
+- `POWERLINE_AUTOCOMPLETE_EVENTS`
+- `POWERLINE_AUTOCOMPLETE_PROTOCOL_VERSION`
+- `PowerlineAutocompleteEnhancer`
+- `PowerlineAutocompleteEnhancerTrigger`
+
+Example:
+
+```ts
+import {
+  connectPowerlineAutocompleteExtension,
+  type PowerlineAutocompleteEnhancer,
+} from "pi-powerline-footer";
+
+const enhancers: PowerlineAutocompleteEnhancer[] = [
+  {
+    id: "session-handoff",
+    trigger: { prefixes: ["@session", "@session:"] },
+    enhance(baseProvider) {
+      return {
+        getSuggestions(lines, cursorLine, cursorCol) {
+          const base = baseProvider.getSuggestions(lines, cursorLine, cursorCol);
+          return {
+            prefix: "@session",
+            items: [
+              { value: "@session:abc123", label: "@session:abc123", description: "handoff target" },
+              ...(base?.items ?? []),
+            ],
+          };
+        },
+        applyCompletion: baseProvider.applyCompletion.bind(baseProvider),
+      };
+    },
+  },
+];
+
+export default function myExtension(pi) {
+  const disconnect = connectPowerlineAutocompleteExtension(pi.events, {
+    extension: { id: "my-extension", version: "1.0.0" },
+    enhancers,
+  });
+
+  pi.on("session_shutdown", async () => {
+    disconnect();
+  });
+}
+```
+
+Powerline hosts the enhancer registry and re-wraps pi's base autocomplete provider, so load order is safe and native file/slash completion stays intact.
+
 ## Editor Stash
 
 Use `Alt+S` as a quick stash toggle while drafting. It keeps one active stash and clears the editor when stashing.
