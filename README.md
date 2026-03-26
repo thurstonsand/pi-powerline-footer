@@ -264,6 +264,8 @@ How it works:
 
 This keeps Pi's native autocomplete UI and file/slash completion behavior intact while letting external extensions layer custom provider logic on top.
 
+Enhancers can also return an optional `getPowerlineAutocompleteHint()` method on the wrapped provider. Powerline renders that hint below the editor only while Pi's autocomplete list is visible.
+
 **Current scope:** cross-extension autocomplete over `pi.events` is supported now. File-based local autocomplete entrypoints under `~/.pi/agent/powerline/autocomplete/` are planned later and are not part of the current release surface.
 
 #### Custom segment TypeScript API

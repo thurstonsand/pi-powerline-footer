@@ -5,6 +5,7 @@
 ### Added
 - **Cross-extension autocomplete bridge** — Powerline now lets other extensions contribute autocomplete enhancers over `pi.events` without competing for editor ownership. The package root exports `connectPowerlineAutocompleteExtension(...)`, protocol constants, and enhancer types for extension authors.
 - **Load-order-safe autocomplete handshake** — External extensions and Powerline recover cleanly regardless of which loads first by combining a scoped ping/reply RPC with a `powerline:autocomplete:ready` broadcast.
+- **Live autocomplete hints** — Wrapped providers can now expose `getPowerlineAutocompleteHint()`, and Powerline renders the returned hint below the editor only while Pi autocomplete is visible.
 - **Bridge and runtime coverage** — Added tests for hosted enhancer registry behavior, bridge registration/replay/unregister flows, and runtime provider wrapping across matching enhancers.
 
 ### Changed

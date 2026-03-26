@@ -38,6 +38,11 @@ export interface RuntimeAutocompleteProviderOptions {
   onError?(message: string, error?: unknown): void;
 }
 
+export interface PowerlineAutocompleteHintEditor {
+  isShowingAutocomplete(): boolean;
+  getPowerlineAutocompleteHint?(): string | undefined;
+}
+
 function isValidAutocompleteProvider(value: unknown): value is AutocompleteProvider {
   return Boolean(
     value
@@ -170,12 +175,24 @@ export function createRuntimeAutocompleteProvider(
   };
 }
 
+export function getVisiblePowerlineAutocompleteHint(
+  editor: PowerlineAutocompleteHintEditor | null | undefined,
+): string | undefined {
+  if (!editor?.isShowingAutocomplete()) {
+    return undefined;
+  }
+
+  const hint = editor.getPowerlineAutocompleteHint?.()?.trim();
+  return hint || undefined;
+}
+
 export function installRuntimeAutocompleteEnhancerIntegration(
   editor: Editor,
   registry: AutocompleteRegistry,
   options: RuntimeAutocompleteProviderOptions = {},
 ): () => void {
   const reportedErrors = new Set<string>();
+  const runtimeEditor = editor as Editor & Partial<PowerlineAutocompleteHintEditor>;
   const originalSetAutocompleteProvider = editor.setAutocompleteProvider.bind(editor);
   let baseProvider: PowerlineRuntimeAutocompleteProvider | null = null;
 
@@ -195,6 +212,7 @@ export function installRuntimeAutocompleteEnhancerIntegration(
       },
     });
 
+    runtimeEditor.getPowerlineAutocompleteHint = () => wrappedProvider.getPowerlineAutocompleteHint?.();
     originalSetAutocompleteProvider(wrappedProvider);
   };
 
