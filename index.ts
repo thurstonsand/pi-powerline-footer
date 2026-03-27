@@ -1,13 +1,14 @@
 import { getAgentDir, copyToClipboard, type ExtensionAPI, type ExtensionContext, type ReadonlyFooterDataProvider, type Theme } from "@mariozechner/pi-coding-agent";
 import type { AssistantMessage } from "@mariozechner/pi-ai";
 import {
+  fuzzyFilter,
+  type AutocompleteProvider,
+  Input,
   type KeyId,
   type SelectItem,
   SelectList,
   truncateToWidth,
   visibleWidth,
-  Input,
-  fuzzyFilter,
 } from "@mariozechner/pi-tui";
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
 import { join, dirname } from "node:path";
@@ -19,7 +20,6 @@ import type {
   ResolvedPresetDef,
   SegmentContext,
   StatusLinePreset,
-  StatusLineSegmentId,
 } from "./types.js";
 import { CUSTOM_PRESET, PRESET_NAMES, resolvePresetDefinition } from "./presets.js";
 import { isRecord } from "./json.js";
@@ -38,9 +38,9 @@ import {
 } from "./autocomplete-bridge.js";
 import { createAutocompleteRegistry } from "./autocomplete-registry.js";
 import {
-  getVisiblePowerlineAutocompleteHint,
-  installRuntimeAutocompleteEnhancerIntegration,
-  type PowerlineAutocompleteHintEditor,
+  createRuntimeAutocompleteProvider,
+  type PowerlineEnhancedAutocompleteProvider,
+  type PowerlineRuntimeAutocompleteProvider,
 } from "./autocomplete-runtime.js";
 import { ansi, getFgAnsiCode } from "./colors.js";
 import { getGitStatus, invalidateGitStatus, invalidateGitBranch } from "./git-status.js";
@@ -461,7 +461,7 @@ function resolveShortcutConfig(settings: PowerlineSettings): PowerlineShortcuts 
 
 /** Render a single segment and return its content with width */
 function renderSegmentWithWidth(
-  segId: StatusLineSegmentId,
+  segId: string,
   ctx: SegmentContext,
 ): { content: string; width: number; visible: boolean } {
   const rendered = renderSegment(segId, ctx);
@@ -611,16 +611,6 @@ export default function powerlineFooter(pi: ExtensionAPI) {
   let lastLayoutTimestamp = 0;
   let profileSwitchInProgress = false;
 
-  function refreshPowerlineAutocomplete(): void {
-    if (!currentEditor?.isShowingAutocomplete()) {
-      return;
-    }
-
-    // Pi's runtime editor exposes updateAutocomplete(), but the public type marks it private.
-    (currentEditor as { updateAutocomplete?(): void }).updateAutocomplete?.();
-    tuiRef?.requestRender();
-  }
-
   const disposeAutocompleteRefresh = pi.events.on(
     POWERLINE_AUTOCOMPLETE_EVENTS.ui.refresh,
     (raw: unknown) => {
@@ -631,14 +621,7 @@ export default function powerlineFooter(pi: ExtensionAPI) {
         return;
       }
 
-      const hintEditor =
-        currentEditor as PowerlineAutocompleteHintEditor | null;
-      const applied = hintEditor?.applyPowerlineAutocompleteRefresh?.(request);
-      if (applied === false) {
-        return;
-      }
-
-      refreshPowerlineAutocomplete();
+      currentEditor?.applyPowerlineAutocompleteRefresh?.(request);
     },
   );
 
@@ -1989,51 +1972,106 @@ export default function powerlineFooter(pi: ExtensionAPI) {
           return;
         }
 
-        let autocompleteFixed = false;
-
         const editorFactory = (
           tui: any,
           editorTheme: any,
           keybindings: any,
         ) => {
+          class PowerlineEditor extends CustomEditor {
+            private autocompleteFixed = false;
+            private baseAutocompleteProvider: PowerlineEnhancedAutocompleteProvider | null = null;
+            private wrappedAutocompleteProvider: PowerlineRuntimeAutocompleteProvider | null = null;
+
+            override setAutocompleteProvider(provider: AutocompleteProvider): void {
+              this.baseAutocompleteProvider =
+                provider as PowerlineEnhancedAutocompleteProvider;
+              this.refreshPowerlineAutocompleteProvider();
+            }
+
+            refreshPowerlineAutocompleteProvider(): void {
+              if (!this.baseAutocompleteProvider) {
+                return;
+              }
+
+              this.wrappedAutocompleteProvider = createRuntimeAutocompleteProvider(
+                this.baseAutocompleteProvider,
+                autocompleteRegistry,
+                {
+                  events: pi.events,
+                  onError: (message, error) => {
+                    console.error(`[powerline-footer] ${message}`, error);
+                    ctx.ui.notify(message, "error");
+                  },
+                },
+              );
+              super.setAutocompleteProvider(this.wrappedAutocompleteProvider);
+            }
+
+            getPowerlineAutocompleteHint(): string | undefined {
+              return this.wrappedAutocompleteProvider?.getPowerlineAutocompleteHint?.();
+            }
+
+            getVisiblePowerlineAutocompleteHint(): string | undefined {
+              if (!this.isShowingAutocomplete()) {
+                return undefined;
+              }
+
+              const hint = this.getPowerlineAutocompleteHint()?.trim();
+              return hint || undefined;
+            }
+
+            clearPowerlineAutocompleteState(): void {
+              this.wrappedAutocompleteProvider?.clearPowerlineAutocompleteState?.();
+            }
+
+            applyPowerlineAutocompleteRefresh(
+              request: PowerlineAutocompleteRefreshRequest,
+            ): boolean {
+              const applied =
+                this.wrappedAutocompleteProvider?.applyPowerlineAutocompleteRefreshRequest?.(
+                  request,
+                ) ?? false;
+              if (!applied) {
+                return false;
+              }
+
+              this.refreshVisibleAutocomplete();
+              return true;
+            }
+
+            refreshVisibleAutocomplete(): void {
+              if (!this.isShowingAutocomplete()) {
+                return;
+              }
+
+              // Pi's runtime editor exposes updateAutocomplete(), but the public type marks it private.
+              (this as unknown as { updateAutocomplete?(): void }).updateAutocomplete?.();
+              tuiRef?.requestRender();
+            }
+
+            override handleInput(data: string): void {
+              if (!this.autocompleteFixed && !(this as any).autocompleteProvider) {
+                this.autocompleteFixed = true;
+                snapshotPromptHistory(this);
+                ctx.ui.setEditorComponent(editorFactory);
+                currentEditor?.handleInput(data);
+                return;
+              }
+
+              setTimeout(() => dismissWelcome(ctx), 0);
+              super.handleInput(data);
+
+              if (!this.isShowingAutocomplete()) {
+                this.clearPowerlineAutocompleteState();
+              }
+            }
+          }
+
           // Create custom editor that overrides render for status bar below content
-          const editor = new CustomEditor(tui, editorTheme, keybindings);
+          const editor = new PowerlineEditor(tui, editorTheme, keybindings);
           currentEditor = editor;
           trackPromptHistory(editor);
           restorePromptHistory(editor);
-
-          installRuntimeAutocompleteEnhancerIntegration(
-            editor,
-            autocompleteRegistry,
-            {
-              events: pi.events,
-              onError: (message, error) => {
-                console.error(`[powerline-footer] ${message}`, error);
-                ctx.ui.notify(message, "error");
-              },
-            },
-          );
-
-          const originalHandleInput = editor.handleInput.bind(editor);
-          editor.handleInput = (data: string) => {
-            if (!autocompleteFixed && !(editor as any).autocompleteProvider) {
-              autocompleteFixed = true;
-              snapshotPromptHistory(editor);
-              ctx.ui.setEditorComponent(editorFactory);
-              currentEditor?.handleInput(data);
-              return;
-            }
-
-            // Dismiss welcome overlay/header (use setTimeout to avoid re-entrancy)
-            setTimeout(() => dismissWelcome(ctx), 0);
-            originalHandleInput(data);
-
-            if (!editor.isShowingAutocomplete()) {
-              (
-                editor as unknown as PowerlineAutocompleteHintEditor
-              ).clearPowerlineAutocompleteState?.();
-            }
-          };
 
           // Store original render
           const originalRender = editor.render.bind(editor);
@@ -2139,7 +2177,7 @@ export default function powerlineFooter(pi: ExtensionAPI) {
               dispose() {},
               invalidate() {},
               render(width: number): string[] {
-                const hint = getVisiblePowerlineAutocompleteHint(currentEditor);
+                const hint = currentEditor?.getVisiblePowerlineAutocompleteHint?.();
                 if (!hint || width < 2) {
                   return [];
                 }
@@ -2402,10 +2440,10 @@ export {
   queryPowerlineAutocompleteState,
 } from "./autocomplete-bridge.js";
 export type {
-  PowerlineAutocompleteHintEditor,
   PowerlineAutocompleteHintProvider,
   PowerlineAutocompleteInteractionHandle,
   PowerlineEnhancedAutocompleteProvider,
+  PowerlineRuntimeAutocompleteProvider,
 } from "./autocomplete-runtime.js";
 export {
   createPowerlineAutocompleteInteractionHandle,
@@ -2420,7 +2458,6 @@ export type {
   PowerlineAutocompleteEnhancerTrigger,
   RenderedSegment,
   SegmentContext,
-  SegmentLoaderAPI,
   StatusLineSegment,
   StatusLineSegmentOptions,
 } from "./types.js";

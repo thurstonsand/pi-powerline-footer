@@ -8,7 +8,7 @@ import {
 
 function createProvider(label: string): AutocompleteProvider {
   return {
-    getSuggestions(): { items: AutocompleteItem[]; prefix: string } | null {
+    async getSuggestions(): Promise<{ items: AutocompleteItem[]; prefix: string } | null> {
       return { items: [{ value: label, label }], prefix: label };
     },
     applyCompletion(lines, cursorLine, cursorCol) {
@@ -26,7 +26,7 @@ describe("autocomplete enhancer registry", () => {
     expect(root.POWERLINE_AUTOCOMPLETE_PROTOCOL_VERSION).toBe(1);
   });
 
-  test("re-registering the same extension and id replaces the enhancer in place", () => {
+  test("re-registering the same extension and id replaces the enhancer in place", async () => {
     const registry = createAutocompleteRegistry();
 
     registry.upsertInstalledEnhancer("pi-sessions", {
@@ -51,7 +51,9 @@ describe("autocomplete enhancer registry", () => {
     const enhancers = registry.getRegisteredEnhancers();
 
     expect(enhancers.map((enhancer) => enhancer.id)).toEqual(["sessions", "files"]);
-    expect(enhancers[0]?.enhance(createProvider("base")).getSuggestions([], 0, 0)).toEqual({
+    await expect(
+      enhancers[0]?.enhance(createProvider("base")).getSuggestions([], 0, 0, createAutocompleteOptions()),
+    ).resolves.toEqual({
       items: [{ value: "new", label: "new" }],
       prefix: "new",
     });
@@ -76,28 +78,34 @@ describe("autocomplete enhancer registry", () => {
     expect(registry.getRegisteredEnhancers().map((enhancer) => enhancer.id)).toEqual(["sessions", "sessions"]);
   });
 
-  test("applies enhancers in stable host order", () => {
+  test("applies enhancers in stable host order", async () => {
     const registry = createAutocompleteRegistry();
     const trace: string[] = [];
 
     registry.upsertInstalledEnhancer("alpha", {
       id: "alpha",
       enhance(baseProvider) {
-        trace.push(`enhance:${baseProvider.getSuggestions([], 0, 0)?.prefix ?? "none"}->alpha`);
+        void baseProvider
+          .getSuggestions([], 0, 0, createAutocompleteOptions())
+          .then((result) => trace.push(`enhance:${result?.prefix ?? "none"}->alpha`));
         return createProvider("alpha");
       },
     });
     registry.upsertInstalledEnhancer("beta", {
       id: "beta",
       enhance(baseProvider) {
-        trace.push(`enhance:${baseProvider.getSuggestions([], 0, 0)?.prefix ?? "none"}->beta`);
+        void baseProvider
+          .getSuggestions([], 0, 0, createAutocompleteOptions())
+          .then((result) => trace.push(`enhance:${result?.prefix ?? "none"}->beta`));
         return createProvider("beta");
       },
     });
     registry.upsertInstalledEnhancer("gamma", {
       id: "gamma",
       enhance(baseProvider) {
-        trace.push(`enhance:${baseProvider.getSuggestions([], 0, 0)?.prefix ?? "none"}->gamma`);
+        void baseProvider
+          .getSuggestions([], 0, 0, createAutocompleteOptions())
+          .then((result) => trace.push(`enhance:${result?.prefix ?? "none"}->gamma`));
         return createProvider("gamma");
       },
     });
@@ -107,12 +115,16 @@ describe("autocomplete enhancer registry", () => {
       createProvider("base"),
     );
 
+    await Promise.resolve();
+
     expect(trace).toEqual([
       "enhance:base->alpha",
       "enhance:alpha->beta",
       "enhance:beta->gamma",
     ]);
-    expect(finalProvider.getSuggestions([], 0, 0)?.prefix).toBe("gamma");
+    expect(
+      (await finalProvider.getSuggestions([], 0, 0, createAutocompleteOptions()))?.prefix,
+    ).toBe("gamma");
   });
 
   test("removeInstalledEnhancer removes contributions cleanly", () => {
@@ -215,3 +227,9 @@ describe("autocomplete enhancer registry", () => {
     expect(shouldActivate).toHaveBeenCalledWith(["open @session"], 0, "open @session".length);
   });
 });
+
+function createAutocompleteOptions(): { signal: AbortSignal } {
+  return {
+    signal: new AbortController().signal,
+  };
+}

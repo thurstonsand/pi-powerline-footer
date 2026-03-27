@@ -1,8 +1,7 @@
 import type { EventBus } from "@mariozechner/pi-coding-agent";
 import type {
-  AutocompleteItem,
   AutocompleteProvider,
-  Editor,
+  AutocompleteSuggestions,
 } from "@mariozechner/pi-tui";
 
 import type {
@@ -18,32 +17,13 @@ import {
   type PowerlineAutocompleteRefreshRequest,
 } from "./autocomplete-bridge.js";
 
-export interface PowerlineAutocompleteSuggestions {
-  items: AutocompleteItem[];
-  prefix: string;
-}
-
 export interface PowerlineAutocompleteHintProvider {
   getPowerlineAutocompleteHint?(): string | undefined;
 }
 
-export interface PowerlineAutocompleteFileCompletionProvider {
-  getForceFileSuggestions?(
-    lines: string[],
-    cursorLine: number,
-    cursorCol: number,
-  ): PowerlineAutocompleteSuggestions | null;
-  shouldTriggerFileCompletion?(
-    lines: string[],
-    cursorLine: number,
-    cursorCol: number,
-  ): boolean;
-}
-
 export interface PowerlineEnhancedAutocompleteProvider
   extends AutocompleteProvider,
-    PowerlineAutocompleteHintProvider,
-    PowerlineAutocompleteFileCompletionProvider {
+    PowerlineAutocompleteHintProvider {
   setPowerlineAutocompleteData?(data: unknown): void;
   clearPowerlineAutocompleteState?(): void;
 }
@@ -61,15 +41,8 @@ export interface RuntimeAutocompleteProviderOptions {
   onError?(message: string, error?: unknown): void;
 }
 
-interface RuntimePowerlineAutocompleteProvider extends PowerlineEnhancedAutocompleteProvider {
+export interface PowerlineRuntimeAutocompleteProvider extends PowerlineEnhancedAutocompleteProvider {
   applyPowerlineAutocompleteRefreshRequest?(request: PowerlineAutocompleteRefreshRequest): boolean;
-}
-
-export interface PowerlineAutocompleteHintEditor {
-  isShowingAutocomplete(): boolean;
-  getPowerlineAutocompleteHint?(): string | undefined;
-  clearPowerlineAutocompleteState?(): void;
-  applyPowerlineAutocompleteRefresh?(request: PowerlineAutocompleteRefreshRequest): boolean;
 }
 
 function bindMethod<TMethod extends (...args: any[]) => any>(
@@ -98,12 +71,6 @@ function toRuntimeAutocompleteProvider(
 ): PowerlineEnhancedAutocompleteProvider {
   const getSuggestions = provider.getSuggestions.bind(provider);
   const applyCompletion = provider.applyCompletion.bind(provider);
-  const getForceFileSuggestions = bindMethodWithFallback<
-    NonNullable<PowerlineAutocompleteFileCompletionProvider["getForceFileSuggestions"]>
-  >(provider, previousProvider, "getForceFileSuggestions");
-  const shouldTriggerFileCompletion = bindMethodWithFallback<
-    NonNullable<PowerlineAutocompleteFileCompletionProvider["shouldTriggerFileCompletion"]>
-  >(provider, previousProvider, "shouldTriggerFileCompletion");
   const getPowerlineAutocompleteHint = bindMethodWithFallback<
     NonNullable<PowerlineAutocompleteHintProvider["getPowerlineAutocompleteHint"]>
   >(provider, previousProvider, "getPowerlineAutocompleteHint");
@@ -117,8 +84,6 @@ function toRuntimeAutocompleteProvider(
   return {
     getSuggestions,
     applyCompletion,
-    ...(getForceFileSuggestions ? { getForceFileSuggestions } : {}),
-    ...(shouldTriggerFileCompletion ? { shouldTriggerFileCompletion } : {}),
     ...(getPowerlineAutocompleteHint ? { getPowerlineAutocompleteHint } : {}),
     ...(setPowerlineAutocompleteData ? { setPowerlineAutocompleteData } : {}),
     ...(clearPowerlineAutocompleteState ? { clearPowerlineAutocompleteState } : {}),
@@ -269,7 +234,7 @@ export function createRuntimeAutocompleteProvider(
   baseProvider: PowerlineEnhancedAutocompleteProvider,
   registry: AutocompleteRegistry,
   options: RuntimeAutocompleteProviderOptions = {},
-): RuntimePowerlineAutocompleteProvider {
+): PowerlineRuntimeAutocompleteProvider {
   let activeEnhancers: readonly InstalledPowerlineAutocompleteEnhancer[] = [];
   let activeProviders = new Map<string, PowerlineEnhancedAutocompleteProvider>();
   let activeProvider = toRuntimeAutocompleteProvider(baseProvider);
@@ -306,17 +271,21 @@ export function createRuntimeAutocompleteProvider(
   }
 
   return {
-    getSuggestions(lines, cursorLine, cursorCol) {
-      return resolveActiveProvider(lines, cursorLine, cursorCol).getSuggestions(lines, cursorLine, cursorCol);
+    getSuggestions(
+      lines,
+      cursorLine,
+      cursorCol,
+      options,
+    ): Promise<AutocompleteSuggestions | null> {
+      return resolveActiveProvider(lines, cursorLine, cursorCol).getSuggestions(
+        lines,
+        cursorLine,
+        cursorCol,
+        options,
+      );
     },
     applyCompletion(lines, cursorLine, cursorCol, item, prefix) {
       return resolveActiveProvider(lines, cursorLine, cursorCol).applyCompletion(lines, cursorLine, cursorCol, item, prefix);
-    },
-    getForceFileSuggestions(lines, cursorLine, cursorCol) {
-      return resolveActiveProvider(lines, cursorLine, cursorCol).getForceFileSuggestions?.(lines, cursorLine, cursorCol) ?? null;
-    },
-    shouldTriggerFileCompletion(lines, cursorLine, cursorCol) {
-      return resolveActiveProvider(lines, cursorLine, cursorCol).shouldTriggerFileCompletion?.(lines, cursorLine, cursorCol) ?? true;
     },
     getPowerlineAutocompleteHint() {
       return activeProvider.getPowerlineAutocompleteHint?.();
@@ -338,67 +307,4 @@ export function createRuntimeAutocompleteProvider(
       return true;
     },
   };
-}
-
-export function getVisiblePowerlineAutocompleteHint(
-  editor: PowerlineAutocompleteHintEditor | null | undefined,
-): string | undefined {
-  if (!editor?.isShowingAutocomplete()) {
-    return undefined;
-  }
-
-  const hint = editor.getPowerlineAutocompleteHint?.()?.trim();
-  return hint || undefined;
-}
-
-export function installRuntimeAutocompleteEnhancerIntegration(
-  editor: Editor,
-  registry: AutocompleteRegistry,
-  options: RuntimeAutocompleteProviderOptions = {},
-): () => void {
-  const reportedErrors = new Set<string>();
-  const runtimeEditor = editor as Editor & Partial<PowerlineAutocompleteHintEditor>;
-  const originalSetAutocompleteProvider = editor.setAutocompleteProvider.bind(editor);
-  let baseProvider: PowerlineEnhancedAutocompleteProvider | null = null;
-  let wrappedProvider: RuntimePowerlineAutocompleteProvider | null = null;
-
-  function installProvider(): void {
-    if (!baseProvider) {
-      return;
-    }
-
-    wrappedProvider = createRuntimeAutocompleteProvider(baseProvider, registry, {
-      events: options.events,
-      onError: (message, error) => {
-        if (reportedErrors.has(message)) {
-          return;
-        }
-
-        reportedErrors.add(message);
-        options.onError?.(message, error);
-      },
-    });
-
-    runtimeEditor.getPowerlineAutocompleteHint = () => wrappedProvider?.getPowerlineAutocompleteHint?.();
-    runtimeEditor.clearPowerlineAutocompleteState = () => {
-      wrappedProvider?.clearPowerlineAutocompleteState?.();
-    };
-    runtimeEditor.applyPowerlineAutocompleteRefresh = (request: PowerlineAutocompleteRefreshRequest) => {
-      if (!wrappedProvider) {
-        return false;
-      }
-
-      return wrappedProvider.applyPowerlineAutocompleteRefreshRequest?.(request) ?? false;
-    };
-    originalSetAutocompleteProvider(wrappedProvider);
-  }
-
-  const unsubscribe = registry.subscribe(installProvider);
-
-  editor.setAutocompleteProvider = (provider: AutocompleteProvider) => {
-    baseProvider = provider as PowerlineEnhancedAutocompleteProvider;
-    installProvider();
-  };
-
-  return unsubscribe;
 }
