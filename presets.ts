@@ -30,15 +30,7 @@ const NERD_COLORS: ColorScheme = {
   cost: "warning",
 };
 
-export const PRESET_NAMES = [
-  "default",
-  "minimal",
-  "compact",
-  "full",
-  "nerd",
-  "ascii",
-  "custom",
-] as const;
+export const PRESET_NAMES = ["default", "minimal", "compact", "full", "nerd", "ascii", "custom"] as const;
 
 const BUILTIN_PRESETS: Record<BuiltinStatusLinePreset, PresetDef> = {
   default: {
@@ -78,7 +70,16 @@ const BUILTIN_PRESETS: Record<BuiltinStatusLinePreset, PresetDef> = {
 
   full: {
     leftSegments: ["pi", "hostname", "model", "thinking", "path", "git", "subagents"],
-    rightSegments: ["token_in", "token_out", "cache_read", "cost", "context_pct", "time_spent", "time", "extension_statuses"],
+    rightSegments: [
+      "token_in",
+      "token_out",
+      "cache_read",
+      "cost",
+      "context_pct",
+      "time_spent",
+      "time",
+      "extension_statuses",
+    ],
     separator: "powerline",
     colors: DEFAULT_COLORS,
     segmentOptions: {
@@ -91,7 +92,18 @@ const BUILTIN_PRESETS: Record<BuiltinStatusLinePreset, PresetDef> = {
 
   nerd: {
     leftSegments: ["pi", "hostname", "model", "thinking", "path", "git", "session", "subagents"],
-    rightSegments: ["token_in", "token_out", "cache_read", "cache_write", "cost", "context_pct", "context_total", "time_spent", "time", "extension_statuses"],
+    rightSegments: [
+      "token_in",
+      "token_out",
+      "cache_read",
+      "cache_write",
+      "cost",
+      "context_pct",
+      "context_total",
+      "time_spent",
+      "time",
+      "extension_statuses",
+    ],
     separator: "powerline",
     colors: NERD_COLORS,
     segmentOptions: {

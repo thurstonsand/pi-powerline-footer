@@ -62,14 +62,7 @@ export type StatusLineSeparatorStyle =
   | "star";
 
 // Preset names
-export type StatusLinePreset =
-  | "default"
-  | "minimal"
-  | "compact"
-  | "full"
-  | "nerd"
-  | "ascii"
-  | "custom";
+export type StatusLinePreset = "default" | "minimal" | "compact" | "full" | "nerd" | "ascii" | "custom";
 
 export type BuiltinStatusLinePreset = Exclude<StatusLinePreset, "custom">;
 
@@ -166,7 +159,7 @@ export interface SegmentContext {
   activeProfileIndex: number | null;
   activeProfileLabel: string | null;
   sessionId: string | undefined;
-  
+
   // Computed
   usageStats: UsageStats;
   contextPercent: number;
@@ -174,16 +167,16 @@ export interface SegmentContext {
   autoCompactEnabled: boolean;
   usingSubscription: boolean;
   sessionStartTime: number;
-  
+
   // Git
   git: GitStatus;
-  
+
   // Extension statuses
   extensionStatuses: ReadonlyMap<string, string>;
-  
+
   // Options
   options: StatusLineSegmentOptions;
-  
+
   // Theming
   theme: Theme;
   colors: ColorScheme;

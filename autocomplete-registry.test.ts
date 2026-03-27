@@ -1,10 +1,7 @@
 import type { AutocompleteItem, AutocompleteProvider } from "@mariozechner/pi-tui";
 import { describe, expect, test, vi } from "vitest";
 
-import {
-  createAutocompleteRegistry,
-  shouldActivateAutocompleteEnhancer,
-} from "./autocomplete-registry.js";
+import { createAutocompleteRegistry, shouldActivateAutocompleteEnhancer } from "./autocomplete-registry.js";
 
 function createProvider(label: string): AutocompleteProvider {
   return {
@@ -110,21 +107,14 @@ describe("autocomplete enhancer registry", () => {
       },
     });
 
-    const finalProvider = registry.getRegisteredEnhancers().reduce(
-      (provider, enhancer) => enhancer.enhance(provider),
-      createProvider("base"),
-    );
+    const finalProvider = registry
+      .getRegisteredEnhancers()
+      .reduce((provider, enhancer) => enhancer.enhance(provider), createProvider("base"));
 
     await Promise.resolve();
 
-    expect(trace).toEqual([
-      "enhance:base->alpha",
-      "enhance:alpha->beta",
-      "enhance:beta->gamma",
-    ]);
-    expect(
-      (await finalProvider.getSuggestions([], 0, 0, createAutocompleteOptions()))?.prefix,
-    ).toBe("gamma");
+    expect(trace).toEqual(["enhance:base->alpha", "enhance:alpha->beta", "enhance:beta->gamma"]);
+    expect((await finalProvider.getSuggestions([], 0, 0, createAutocompleteOptions()))?.prefix).toBe("gamma");
   });
 
   test("removeInstalledEnhancer removes contributions cleanly", () => {
@@ -190,19 +180,23 @@ describe("autocomplete enhancer registry", () => {
       },
     });
 
-    expect(shouldActivateAutocompleteEnhancer(
-      entry.enhancer,
-      ["inspect @session:1a794629"],
-      0,
-      "inspect @session:1a794629".length,
-    )).toBe(true);
+    expect(
+      shouldActivateAutocompleteEnhancer(
+        entry.enhancer,
+        ["inspect @session:1a794629"],
+        0,
+        "inspect @session:1a794629".length,
+      ),
+    ).toBe(true);
 
-    expect(shouldActivateAutocompleteEnhancer(
-      entry.enhancer,
-      ["inspect session:1a794629"],
-      0,
-      "inspect session:1a794629".length,
-    )).toBe(false);
+    expect(
+      shouldActivateAutocompleteEnhancer(
+        entry.enhancer,
+        ["inspect session:1a794629"],
+        0,
+        "inspect session:1a794629".length,
+      ),
+    ).toBe(false);
   });
 
   test("shouldActivate uses the custom trigger predicate result", () => {
@@ -222,7 +216,9 @@ describe("autocomplete enhancer registry", () => {
     });
 
     expect(shouldActivateAutocompleteEnhancer(entry.enhancer, ["open #session"], 0, "open #session".length)).toBe(true);
-    expect(shouldActivateAutocompleteEnhancer(entry.enhancer, ["open @session"], 0, "open @session".length)).toBe(false);
+    expect(shouldActivateAutocompleteEnhancer(entry.enhancer, ["open @session"], 0, "open @session".length)).toBe(
+      false,
+    );
     expect(shouldActivate).toHaveBeenCalledWith(["open #session"], 0, "open #session".length);
     expect(shouldActivate).toHaveBeenCalledWith(["open @session"], 0, "open @session".length);
   });

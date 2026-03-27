@@ -63,9 +63,7 @@ function validateSegment(segment: unknown): StatusLineSegment {
 }
 
 function getExistingCustomSource(id: string, layer: "programmatic" | "file"): string | undefined {
-  return layer === "programmatic"
-    ? programmaticSources.get(id)
-    : fileSources.get(id);
+  return layer === "programmatic" ? programmaticSources.get(id) : fileSources.get(id);
 }
 
 function assertSegmentIdAvailable(id: string, source: string, layer: "programmatic" | "file"): void {
@@ -140,10 +138,12 @@ function resolveSegmentEntries(dir: string): SegmentEntrypoint[] | null {
   for (const entrypoint of SUPPORTED_DIRECTORY_ENTRYPOINTS) {
     const filePath = join(dir, entrypoint);
     if (existsSync(filePath)) {
-      return [{
-        source: `${dir.replace(/.*[\\/]/, "")}/${entrypoint}`,
-        filePath,
-      }];
+      return [
+        {
+          source: `${dir.replace(/.*[\\/]/, "")}/${entrypoint}`,
+          filePath,
+        },
+      ];
     }
   }
 
@@ -157,8 +157,9 @@ function discoverSegmentEntrypoints(directory: string): SegmentEntrypoint[] {
 
   try {
     const discovered: SegmentEntrypoint[] = [];
-    const entries = readdirSync(directory, { withFileTypes: true, encoding: "utf8" })
-      .sort((a, b) => a.name.localeCompare(b.name));
+    const entries = readdirSync(directory, { withFileTypes: true, encoding: "utf8" }).sort((a, b) =>
+      a.name.localeCompare(b.name),
+    );
 
     for (const entry of entries) {
       const entryPath = join(directory, entry.name);
@@ -217,7 +218,9 @@ export function registerSegment(segment: unknown, source: string = "registerSegm
   return normalized;
 }
 
-export async function loadSegmentsFromDirectory(directory: string = getCustomSegmentsDir()): Promise<SegmentLoadResult> {
+export async function loadSegmentsFromDirectory(
+  directory: string = getCustomSegmentsDir(),
+): Promise<SegmentLoadResult> {
   clearFileSegments();
 
   const result: SegmentLoadResult = {
@@ -246,9 +249,11 @@ export function getRegisteredSegment(id: StatusLineSegmentId): StatusLineSegment
     return undefined;
   }
 
-  return fileSegments.get(normalizedId)
-    ?? programmaticSegments.get(normalizedId)
-    ?? BUILTIN_SEGMENTS[normalizedId as BuiltinStatusLineSegmentId];
+  return (
+    fileSegments.get(normalizedId) ??
+    programmaticSegments.get(normalizedId) ??
+    BUILTIN_SEGMENTS[normalizedId as BuiltinStatusLineSegmentId]
+  );
 }
 
 export function getCustomSegmentLoadErrors(): readonly string[] {

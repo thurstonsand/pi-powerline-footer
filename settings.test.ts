@@ -130,11 +130,7 @@ describe("applyPowerlineSettings", () => {
         vibe: { theme: "zen" },
       },
       {
-        deleteLegacyKeys: [
-          LEGACY_POWERLINE_PROFILE_KEY,
-          LEGACY_POWERLINE_SHORTCUTS_KEY,
-          ...LEGACY_POWERLINE_VIBE_KEYS,
-        ],
+        deleteLegacyKeys: [LEGACY_POWERLINE_PROFILE_KEY, LEGACY_POWERLINE_SHORTCUTS_KEY, ...LEGACY_POWERLINE_VIBE_KEYS],
       },
     );
 

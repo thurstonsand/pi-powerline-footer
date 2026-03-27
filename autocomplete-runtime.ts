@@ -1,13 +1,7 @@
 import type { EventBus } from "@mariozechner/pi-coding-agent";
-import type {
-  AutocompleteProvider,
-  AutocompleteSuggestions,
-} from "@mariozechner/pi-tui";
+import type { AutocompleteProvider, AutocompleteSuggestions } from "@mariozechner/pi-tui";
 
-import type {
-  AutocompleteRegistry,
-  InstalledPowerlineAutocompleteEnhancer,
-} from "./autocomplete-registry.js";
+import type { AutocompleteRegistry, InstalledPowerlineAutocompleteEnhancer } from "./autocomplete-registry.js";
 import { shouldActivateAutocompleteEnhancer } from "./autocomplete-registry.js";
 import {
   POWERLINE_AUTOCOMPLETE_EVENTS,
@@ -21,9 +15,7 @@ export interface PowerlineAutocompleteHintProvider {
   getPowerlineAutocompleteHint?(): string | undefined;
 }
 
-export interface PowerlineEnhancedAutocompleteProvider
-  extends AutocompleteProvider,
-    PowerlineAutocompleteHintProvider {
+export interface PowerlineEnhancedAutocompleteProvider extends AutocompleteProvider, PowerlineAutocompleteHintProvider {
   setPowerlineAutocompleteData?(data: unknown): void;
   clearPowerlineAutocompleteState?(): void;
 }
@@ -101,10 +93,7 @@ function sameEnhancerSet(
   return left.every((entry, index) => entry.id === right[index]?.id);
 }
 
-function emitActiveState(
-  events: EventBus | undefined,
-  entry: InstalledPowerlineAutocompleteEnhancer,
-): void {
+function emitActiveState(events: EventBus | undefined, entry: InstalledPowerlineAutocompleteEnhancer): void {
   if (!events) {
     return;
   }
@@ -166,11 +155,7 @@ function clearInstalledEnhancerState(
   }
 }
 
-export function requestPowerlineAutocompleteRefresh<TData>(
-  events: EventBus,
-  id: string,
-  data?: TData,
-): void {
+export function requestPowerlineAutocompleteRefresh<TData>(events: EventBus, id: string, data?: TData): void {
   const payload: PowerlineAutocompleteRefreshRequest<TData> = { installedId: id, data };
   events.emit(POWERLINE_AUTOCOMPLETE_EVENTS.ui.refresh, payload);
 }
@@ -244,9 +229,9 @@ export function createRuntimeAutocompleteProvider(
     cursorLine: number,
     cursorCol: number,
   ): PowerlineEnhancedAutocompleteProvider {
-    const matchingEnhancers = registry.getInstalledEnhancers().filter((entry) =>
-      shouldActivateAutocompleteEnhancer(entry.enhancer, lines, cursorLine, cursorCol),
-    );
+    const matchingEnhancers = registry
+      .getInstalledEnhancers()
+      .filter((entry) => shouldActivateAutocompleteEnhancer(entry.enhancer, lines, cursorLine, cursorCol));
 
     if (sameEnhancerSet(activeEnhancers, matchingEnhancers)) {
       return activeProvider;
@@ -271,21 +256,17 @@ export function createRuntimeAutocompleteProvider(
   }
 
   return {
-    getSuggestions(
-      lines,
-      cursorLine,
-      cursorCol,
-      options,
-    ): Promise<AutocompleteSuggestions | null> {
-      return resolveActiveProvider(lines, cursorLine, cursorCol).getSuggestions(
+    getSuggestions(lines, cursorLine, cursorCol, options): Promise<AutocompleteSuggestions | null> {
+      return resolveActiveProvider(lines, cursorLine, cursorCol).getSuggestions(lines, cursorLine, cursorCol, options);
+    },
+    applyCompletion(lines, cursorLine, cursorCol, item, prefix) {
+      return resolveActiveProvider(lines, cursorLine, cursorCol).applyCompletion(
         lines,
         cursorLine,
         cursorCol,
-        options,
+        item,
+        prefix,
       );
-    },
-    applyCompletion(lines, cursorLine, cursorCol, item, prefix) {
-      return resolveActiveProvider(lines, cursorLine, cursorCol).applyCompletion(lines, cursorLine, cursorCol, item, prefix);
     },
     getPowerlineAutocompleteHint() {
       return activeProvider.getPowerlineAutocompleteHint?.();

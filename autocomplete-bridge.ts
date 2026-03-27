@@ -77,8 +77,7 @@ export type PowerlineAutocompleteInactiveReason =
   | "editor_replaced"
   | "shutdown";
 
-export interface PowerlineAutocompleteInactiveStateData
-  extends PowerlineAutocompleteActiveStateData {
+export interface PowerlineAutocompleteInactiveStateData extends PowerlineAutocompleteActiveStateData {
   reason: PowerlineAutocompleteInactiveReason;
 }
 
@@ -233,14 +232,7 @@ function emitRpcCall<TReplyData>(
   debugBase: RpcDebugBase,
   debug: DebugLogger,
 ): CancellablePromise<TReplyData> {
-  const wait = createReplyWait<TReplyData>(
-    events,
-    channel,
-    request.requestId,
-    timeoutMs,
-    debugBase,
-    debug,
-  );
+  const wait = createReplyWait<TReplyData>(events, channel, request.requestId, timeoutMs, debugBase, debug);
   debug?.({
     type: createRpcDebugType(debugBase, "emit"),
     channel,
@@ -265,19 +257,11 @@ function installPingRpcHandler(events: EventBus, debug: DebugLogger): () => void
       success: true,
       data: { version: POWERLINE_AUTOCOMPLETE_PROTOCOL_VERSION },
     };
-    events.emit(
-      createReplyChannel(POWERLINE_AUTOCOMPLETE_EVENTS.rpc.ping, request.requestId),
-      reply,
-    );
+    events.emit(createReplyChannel(POWERLINE_AUTOCOMPLETE_EVENTS.rpc.ping, request.requestId), reply);
   });
 }
 
-function replyToRpc<TData = void>(
-  events: EventBus,
-  channel: string,
-  requestId: string,
-  handler: () => TData,
-): void {
+function replyToRpc<TData = void>(events: EventBus, channel: string, requestId: string, handler: () => TData): void {
   const replyChannel = createReplyChannel(channel, requestId);
   try {
     const data = handler();
@@ -292,11 +276,7 @@ function replyToRpc<TData = void>(
   }
 }
 
-function installRegisterRpcHandler(
-  events: EventBus,
-  registry: AutocompleteRegistry,
-  debug: DebugLogger,
-): () => void {
+function installRegisterRpcHandler(events: EventBus, registry: AutocompleteRegistry, debug: DebugLogger): () => void {
   return events.on(POWERLINE_AUTOCOMPLETE_EVENTS.rpc.register, (raw: unknown) => {
     const request = raw as PowerlineAutocompleteRegisterRequest;
     debug?.({
@@ -319,11 +299,7 @@ function installRegisterRpcHandler(
   });
 }
 
-function installUnregisterRpcHandler(
-  events: EventBus,
-  registry: AutocompleteRegistry,
-  debug: DebugLogger,
-): () => void {
+function installUnregisterRpcHandler(events: EventBus, registry: AutocompleteRegistry, debug: DebugLogger): () => void {
   return events.on(POWERLINE_AUTOCOMPLETE_EVENTS.rpc.unregister, (raw: unknown) => {
     const request = raw as PowerlineAutocompleteUnregisterRequest;
     debug?.({
@@ -376,21 +352,15 @@ export function installPowerlineAutocompleteBridge(
   const debug = options?.debug;
   const activeInstalledIds = new Set<string>();
 
-  const unsubscribeActive = events.on(
-    POWERLINE_AUTOCOMPLETE_EVENTS.state.active,
-    (raw: unknown) => {
-      const event = raw as PowerlineAutocompleteActiveStateData;
-      activeInstalledIds.add(event.installedId);
-    },
-  );
+  const unsubscribeActive = events.on(POWERLINE_AUTOCOMPLETE_EVENTS.state.active, (raw: unknown) => {
+    const event = raw as PowerlineAutocompleteActiveStateData;
+    activeInstalledIds.add(event.installedId);
+  });
 
-  const unsubscribeInactive = events.on(
-    POWERLINE_AUTOCOMPLETE_EVENTS.state.inactive,
-    (raw: unknown) => {
-      const event = raw as PowerlineAutocompleteInactiveStateData;
-      activeInstalledIds.delete(event.installedId);
-    },
-  );
+  const unsubscribeInactive = events.on(POWERLINE_AUTOCOMPLETE_EVENTS.state.inactive, (raw: unknown) => {
+    const event = raw as PowerlineAutocompleteInactiveStateData;
+    activeInstalledIds.delete(event.installedId);
+  });
 
   const unsubscribePing = installPingRpcHandler(events, debug);
   const unsubscribeRegister = installRegisterRpcHandler(events, registry, debug);

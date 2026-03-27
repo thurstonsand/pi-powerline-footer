@@ -159,12 +159,8 @@ describe("autocomplete bridge", () => {
       enhancerId: "sessions",
     });
 
-    await expect(
-      queryPowerlineAutocompleteState(events, "pi-sessions::sessions", 20),
-    ).resolves.toBe(true);
-    await expect(queryPowerlineAutocompleteState(events, "pi-sessions::missing", 20)).resolves.toBe(
-      false,
-    );
+    await expect(queryPowerlineAutocompleteState(events, "pi-sessions::sessions", 20)).resolves.toBe(true);
+    await expect(queryPowerlineAutocompleteState(events, "pi-sessions::missing", 20)).resolves.toBe(false);
     expect(bridge.isActiveInstalledAutocomplete("pi-sessions::sessions")).toBe(true);
     expect(bridge.isActiveInstalledAutocomplete("pi-sessions::missing")).toBe(false);
 

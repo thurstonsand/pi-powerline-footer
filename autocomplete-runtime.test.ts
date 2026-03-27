@@ -1,8 +1,5 @@
 import { createEventBus, type EventBus } from "@mariozechner/pi-coding-agent";
-import type {
-  AutocompleteItem,
-  AutocompleteProvider,
-} from "@mariozechner/pi-tui";
+import type { AutocompleteItem, AutocompleteProvider } from "@mariozechner/pi-tui";
 import { describe, expect, test } from "vitest";
 
 import { createAutocompleteRegistry } from "./autocomplete-registry.js";
@@ -46,7 +43,7 @@ function wrapProvider(baseProvider: AutocompleteProvider, suffix: string): Autoc
       const result = baseProvider.applyCompletion(lines, cursorLine, cursorCol, item, prefix);
       return {
         ...result,
-        lines: result.lines.map((line, index) => index === cursorLine ? `${line}|${suffix}` : line),
+        lines: result.lines.map((line, index) => (index === cursorLine ? `${line}|${suffix}` : line)),
       };
     },
   };
@@ -104,30 +101,12 @@ describe("runtime autocomplete provider", () => {
     );
 
     const hashLine = "open #session";
-    expect(
-      (
-        await provider.getSuggestions(
-          [hashLine],
-          0,
-          hashLine.length,
-          createAutocompleteOptions(),
-        )
-      )?.prefix,
-    ).toBe(
+    expect((await provider.getSuggestions([hashLine], 0, hashLine.length, createAutocompleteOptions()))?.prefix).toBe(
       "#session|always|hash",
     );
 
     const plainLine = "open plain";
-    expect(
-      (
-        await provider.getSuggestions(
-          [plainLine],
-          0,
-          plainLine.length,
-          createAutocompleteOptions(),
-        )
-      )?.prefix,
-    ).toBe(
+    expect((await provider.getSuggestions([plainLine], 0, plainLine.length, createAutocompleteOptions()))?.prefix).toBe(
       "plain|always",
     );
 
@@ -156,11 +135,9 @@ describe("runtime autocomplete provider", () => {
     );
     const line = "open @session";
 
-    expect(
-      (
-        await provider.getSuggestions([line], 0, line.length, createAutocompleteOptions())
-      )?.prefix,
-    ).toBe("@session|sessions");
+    expect((await provider.getSuggestions([line], 0, line.length, createAutocompleteOptions()))?.prefix).toBe(
+      "@session|sessions",
+    );
     expect(provider.getPowerlineAutocompleteHint?.()).toBe("base hint");
   });
 
@@ -217,45 +194,22 @@ describe("runtime autocomplete provider", () => {
       },
     });
 
-    const provider = createRuntimeAutocompleteProvider(
-      createRuntimeBaseProvider(),
-      registry,
-    );
+    const provider = createRuntimeAutocompleteProvider(createRuntimeBaseProvider(), registry);
 
     const sessionLine = "open @session:abc";
     expect(
-      (
-        await provider.getSuggestions(
-          [sessionLine],
-          0,
-          sessionLine.length,
-          createAutocompleteOptions(),
-        )
-      )?.prefix,
-    ).toBe(
-      "@session:abc|sessions",
-    );
+      (await provider.getSuggestions([sessionLine], 0, sessionLine.length, createAutocompleteOptions()))?.prefix,
+    ).toBe("@session:abc|sessions");
     expect(provider.getPowerlineAutocompleteHint?.()).toBe("Ctrl+A: show all sessions");
 
     hint = "Ctrl+A: show only direct lineage";
-    expect(provider.getPowerlineAutocompleteHint?.()).toBe(
-      "Ctrl+A: show only direct lineage",
-    );
+    expect(provider.getPowerlineAutocompleteHint?.()).toBe("Ctrl+A: show only direct lineage");
 
     provider.clearPowerlineAutocompleteState?.();
     expect(cleared).toBe(true);
 
     const plainLine = "open plain";
-    expect(
-      (
-        await provider.getSuggestions(
-          [plainLine],
-          0,
-          plainLine.length,
-          createAutocompleteOptions(),
-        )
-      )?.prefix,
-    ).toBe(
+    expect((await provider.getSuggestions([plainLine], 0, plainLine.length, createAutocompleteOptions()))?.prefix).toBe(
       "plain",
     );
     expect(provider.getPowerlineAutocompleteHint?.()).toBeUndefined();

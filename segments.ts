@@ -146,9 +146,7 @@ const gitSegment: StatusLineSegment<GitSegmentOptions> = {
     const icons = getIcons();
     const opts = options ?? {};
     const { branch, staged, unstaged, untracked } = ctx.git;
-    const gitStatus = (staged > 0 || unstaged > 0 || untracked > 0) 
-      ? { staged, unstaged, untracked } 
-      : null;
+    const gitStatus = staged > 0 || unstaged > 0 || untracked > 0 ? { staged, unstaged, untracked } : null;
 
     if (!branch && !gitStatus) return { content: "", visible: false };
 
@@ -418,7 +416,7 @@ const extensionStatusesSegment: StatusLineSegment = {
     // and strings that are only ANSI codes with no visible text
     const parts: string[] = [];
     for (const value of statuses.values()) {
-      if (value && !value.trimStart().startsWith('[') && visibleWidth(value) > 0) {
+      if (value && !value.trimStart().startsWith("[") && visibleWidth(value) > 0) {
         // Strip trailing separators (· | · etc.) that some extensions bake in,
         // since we add our own SEP_DOT joiner between entries.
         // The separator may be wrapped in ANSI codes, so strip those too.

@@ -1,7 +1,4 @@
-import type {
-  PowerlineAutocompleteEnhancer,
-  PowerlineAutocompleteEnhancerTrigger,
-} from "./types.js";
+import type { PowerlineAutocompleteEnhancer, PowerlineAutocompleteEnhancerTrigger } from "./types.js";
 
 export interface InstalledPowerlineAutocompleteEnhancer {
   id: string;
@@ -29,11 +26,7 @@ function normalizeTriggerPrefixes(prefixes?: string[]): string[] | undefined {
     return undefined;
   }
 
-  const normalized = Array.from(
-    new Set(
-      prefixes.map((value) => value.trim()).filter((value) => value.length > 0),
-    ),
-  );
+  const normalized = Array.from(new Set(prefixes.map((value) => value.trim()).filter((value) => value.length > 0)));
 
   return normalized.length > 0 ? normalized : undefined;
 }

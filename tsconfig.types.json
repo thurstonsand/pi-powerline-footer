@@ -8,5 +8,6 @@
     "outDir": "./dist",
     "rootDir": "."
   },
-  "include": ["./*.ts"]
+  "include": ["./*.ts"],
+  "exclude": ["./*.test.ts"]
 }

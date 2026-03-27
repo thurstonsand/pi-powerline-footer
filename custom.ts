@@ -18,15 +18,11 @@ export function normalizeCustomSettings(value: unknown): unknown {
   }
 
   if (hasOwn(value, "leftSegments")) {
-    normalized.leftSegments = Array.isArray(value.leftSegments)
-      ? [...value.leftSegments]
-      : value.leftSegments;
+    normalized.leftSegments = Array.isArray(value.leftSegments) ? [...value.leftSegments] : value.leftSegments;
   }
 
   if (hasOwn(value, "rightSegments")) {
-    normalized.rightSegments = Array.isArray(value.rightSegments)
-      ? [...value.rightSegments]
-      : value.rightSegments;
+    normalized.rightSegments = Array.isArray(value.rightSegments) ? [...value.rightSegments] : value.rightSegments;
   }
 
   if (hasOwn(value, "secondarySegments")) {
@@ -55,11 +51,9 @@ function normalizeSegmentList(value: unknown): StatusLineSegmentId[] {
     return [];
   }
 
-  return value.map((segment) => (
-    typeof segment === "string"
-      ? segment.trim().toLowerCase()
-      : segment
-  )) as StatusLineSegmentId[];
+  return value.map((segment) =>
+    typeof segment === "string" ? segment.trim().toLowerCase() : segment,
+  ) as StatusLineSegmentId[];
 }
 
 function normalizeSegmentOptions(value: unknown): StatusLineSegmentOptions {
@@ -74,9 +68,7 @@ function normalizeSegmentOptions(value: unknown): StatusLineSegmentOptions {
       continue;
     }
 
-    normalized[normalizedKey] = isRecord(optionValue)
-      ? { ...optionValue }
-      : optionValue;
+    normalized[normalizedKey] = isRecord(optionValue) ? { ...optionValue } : optionValue;
   }
 
   return normalized as StatusLineSegmentOptions;

@@ -30,11 +30,7 @@ import {
   type PowerlineRuntimeAutocompleteProvider,
 } from "./autocomplete-runtime.js";
 import { ansi, getFgAnsiCode } from "./colors.js";
-import {
-  getGitStatus,
-  invalidateGitBranch,
-  invalidateGitStatus,
-} from "./git-status.js";
+import { getGitStatus, invalidateGitBranch, invalidateGitStatus } from "./git-status.js";
 import { isRecord } from "./json.js";
 import { PRESET_NAMES, resolvePresetDefinition } from "./presets.js";
 import {
@@ -49,11 +45,7 @@ import {
   saveProfiles,
   setActiveProfileIndex,
 } from "./profiles.js";
-import {
-  getCustomSegmentLoadErrors,
-  loadSegmentsFromDirectory,
-  renderSegment,
-} from "./segment-registry.js";
+import { getCustomSegmentLoadErrors, loadSegmentsFromDirectory, renderSegment } from "./segment-registry.js";
 import { getSeparator } from "./separators.js";
 import {
   normalizePowerlineSettings,
@@ -75,12 +67,7 @@ import type {
   StatusLineSegment,
   StatusLineSegmentId,
 } from "./types.js";
-import {
-  discoverLoadedCounts,
-  getRecentSessions,
-  WelcomeComponent,
-  WelcomeHeader,
-} from "./welcome.js";
+import { discoverLoadedCounts, getRecentSessions, WelcomeComponent, WelcomeHeader } from "./welcome.js";
 import {
   generateVibesBatch,
   getVibeFileCount,
@@ -213,8 +200,7 @@ function readPromptHistory(editor: any): string[] {
     if (typeof entry !== "string") continue;
     const trimmed = entry.trim();
     if (!trimmed) continue;
-    if (normalized.length > 0 && normalized[normalized.length - 1] === trimmed)
-      continue;
+    if (normalized.length > 0 && normalized[normalized.length - 1] === trimmed) continue;
     normalized.push(trimmed);
     if (normalized.length >= PROMPT_HISTORY_LIMIT) break;
   }
@@ -231,8 +217,7 @@ function snapshotPromptHistory(editor: any): void {
 
 function restorePromptHistory(editor: any): void {
   const { savedPromptHistory } = getPromptHistoryState();
-  if (!savedPromptHistory.length || typeof editor?.addToHistory !== "function")
-    return;
+  if (!savedPromptHistory.length || typeof editor?.addToHistory !== "function") return;
 
   for (let i = savedPromptHistory.length - 1; i >= 0; i--) {
     editor.addToHistory(savedPromptHistory[i]);
@@ -297,18 +282,13 @@ function readPersistedStashHistory(): string[] {
 
     const parsed = JSON.parse(readFileSync(stashHistoryPath, "utf-8"));
     if (!isRecord(parsed)) {
-      console.debug(
-        `[powerline-footer] Ignoring invalid stash history at ${stashHistoryPath}`,
-      );
+      console.debug(`[powerline-footer] Ignoring invalid stash history at ${stashHistoryPath}`);
       return [];
     }
 
     return normalizeStashHistoryEntries(parsed.history);
   } catch (error) {
-    console.debug(
-      `[powerline-footer] Failed to read stash history from ${stashHistoryPath}:`,
-      error,
-    );
+    console.debug(`[powerline-footer] Failed to read stash history from ${stashHistoryPath}:`, error);
     return [];
   }
 }
@@ -324,10 +304,7 @@ function persistStashHistory(history: string[]): void {
     mkdirSync(dirname(stashHistoryPath), { recursive: true });
     writeFileSync(stashHistoryPath, JSON.stringify(payload, null, 2) + "\n");
   } catch (error) {
-    console.debug(
-      `[powerline-footer] Failed to persist stash history to ${stashHistoryPath}:`,
-      error,
-    );
+    console.debug(`[powerline-footer] Failed to persist stash history to ${stashHistoryPath}:`, error);
   }
 }
 
@@ -416,16 +393,11 @@ function parseShortcutOverride(value: unknown): KeyId | null {
     return null;
   }
 
-  const normalizedKey = SHORTCUT_SYMBOL_KEYS.has(keyPart)
-    ? keyPart
-    : keyPart.toLowerCase();
+  const normalizedKey = SHORTCUT_SYMBOL_KEYS.has(keyPart) ? keyPart : keyPart.toLowerCase();
   return [...modifierParts, normalizedKey].join("+") as KeyId;
 }
 
-function findShortcutReplacement(
-  key: PowerlineShortcutKey,
-  used: Set<string>,
-): KeyId | null {
+function findShortcutReplacement(key: PowerlineShortcutKey, used: Set<string>): KeyId | null {
   const preferred = DEFAULT_SHORTCUTS[key];
   if (!used.has(normalizeShortcut(preferred))) {
     return preferred;
@@ -467,15 +439,11 @@ function resolveShortcutConfig(settings: NormalizedPowerlineSettings): Powerline
 
     const replacement = findShortcutReplacement(key, used);
     if (!replacement) {
-      console.debug(
-        `[powerline-footer] Shortcut conflict for ${key}: "${configured}" is already in use`,
-      );
+      console.debug(`[powerline-footer] Shortcut conflict for ${key}: "${configured}" is already in use`);
       continue;
     }
 
-    console.debug(
-      `[powerline-footer] Shortcut conflict for ${key}: "${configured}" replaced with "${replacement}"`,
-    );
+    console.debug(`[powerline-footer] Shortcut conflict for ${key}: "${configured}" replaced with "${replacement}"`);
 
     resolved[key] = replacement;
     used.add(normalizeShortcut(replacement));
@@ -596,8 +564,7 @@ function computeResponsiveLayout(
   const secondarySegments: string[] = [];
 
   for (const seg of overflowSegments) {
-    const neededWidth =
-      seg.width + (secondarySegments.length > 0 ? sepWidth : 0);
+    const neededWidth = seg.width + (secondarySegments.length > 0 ? sepWidth : 0);
     if (secondaryWidth + neededWidth <= availableWidth) {
       secondarySegments.push(seg.content);
       secondaryWidth += neededWidth;
@@ -618,10 +585,7 @@ function computeResponsiveLayout(
 
 export default function powerlineFooter(pi: ExtensionAPI) {
   const autocompleteRegistry = createAutocompleteRegistry();
-  const autocompleteBridge = installPowerlineAutocompleteBridge(
-    pi.events,
-    autocompleteRegistry,
-  );
+  const autocompleteBridge = installPowerlineAutocompleteBridge(pi.events, autocompleteRegistry);
   const rawSettings = readSettings("powerline-footer");
   const resolvedShortcuts = resolveShortcutConfig(normalizePowerlineSettings(rawSettings));
 
@@ -651,19 +615,14 @@ export default function powerlineFooter(pi: ExtensionAPI) {
   let lastCustomPresetErrorNotified: string | null = null;
   let lastCustomSegmentErrorsNotified: string | null = null;
 
-  const disposeAutocompleteRefresh = pi.events.on(
-    POWERLINE_AUTOCOMPLETE_EVENTS.ui.refresh,
-    (raw: unknown) => {
-      const request = raw as PowerlineAutocompleteRefreshRequest;
-      if (
-        !autocompleteBridge.isActiveInstalledAutocomplete(request.installedId)
-      ) {
-        return;
-      }
+  const disposeAutocompleteRefresh = pi.events.on(POWERLINE_AUTOCOMPLETE_EVENTS.ui.refresh, (raw: unknown) => {
+    const request = raw as PowerlineAutocompleteRefreshRequest;
+    if (!autocompleteBridge.isActiveInstalledAutocomplete(request.installedId)) {
+      return;
+    }
 
-      currentEditor?.applyPowerlineAutocompleteRefresh?.(request);
-    },
-  );
+    currentEditor?.applyPowerlineAutocompleteRefresh?.(request);
+  });
 
   function overlaySelectListTheme(theme: Theme) {
     return {
@@ -711,12 +670,7 @@ export default function powerlineFooter(pi: ExtensionAPI) {
 
     if (ctx?.hasUI) {
       const count = errors.length;
-      ctx.ui.notify(
-        count === 1
-          ? errors[0]
-          : `${count} custom segment files failed to load (see console)`,
-        "error",
-      );
+      ctx.ui.notify(count === 1 ? errors[0] : `${count} custom segment files failed to load (see console)`, "error");
     }
 
     lastCustomSegmentErrorsNotified = signature;
@@ -735,17 +689,8 @@ export default function powerlineFooter(pi: ExtensionAPI) {
     maxVisible: number,
   ): Promise<SelectItem | null> {
     return ctx.ui.custom(
-      (
-        tui: any,
-        theme: Theme,
-        _keybindings: any,
-        done: (result: SelectItem | null) => void,
-      ) => {
-        const selectList = new SelectList(
-          items,
-          maxVisible,
-          overlaySelectListTheme(theme),
-        );
+      (tui: any, theme: Theme, _keybindings: any, done: (result: SelectItem | null) => void) => {
+        const selectList = new SelectList(items, maxVisible, overlaySelectListTheme(theme));
         const border = (text: string) => theme.fg("dim", text);
         const wrapRow = (text: string, innerWidth: number): string => {
           return `${border("│")}${truncateToWidth(text, innerWidth, "…", true)}${border("│")}`;
@@ -760,9 +705,7 @@ export default function powerlineFooter(pi: ExtensionAPI) {
             const lines: string[] = [];
 
             lines.push(border(`╭${"─".repeat(innerWidth)}╮`));
-            lines.push(
-              wrapRow(theme.fg("accent", theme.bold(title)), innerWidth),
-            );
+            lines.push(wrapRow(theme.fg("accent", theme.bold(title)), innerWidth));
             lines.push(border(`├${"─".repeat(innerWidth)}┤`));
 
             for (const line of selectList.render(innerWidth)) {
@@ -792,20 +735,12 @@ export default function powerlineFooter(pi: ExtensionAPI) {
     );
   }
 
-  function getLiveProfileMatchIndex(
-    ctx: any,
-    profiles: ProfileConfig[],
-  ): number | null {
+  function getLiveProfileMatchIndex(ctx: any, profiles: ProfileConfig[]): number | null {
     if (!ctx.model?.provider || !ctx.model?.id) {
       return null;
     }
 
-    return findMatchingProfileIndex(
-      profiles,
-      ctx.model.provider,
-      ctx.model.id,
-      pi.getThinkingLevel(),
-    );
+    return findMatchingProfileIndex(profiles, ctx.model.provider, ctx.model.id, pi.getThinkingLevel());
   }
 
   function reloadAndSyncActiveProfile(ctx: any): void {
@@ -814,9 +749,7 @@ export default function powerlineFooter(pi: ExtensionAPI) {
     setActiveProfileIndex(activeIndex);
   }
 
-  async function runWithProfileSwitchLock(
-    action: () => Promise<void>,
-  ): Promise<void> {
+  async function runWithProfileSwitchLock(action: () => Promise<void>): Promise<void> {
     if (profileSwitchInProgress) {
       return;
     }
@@ -924,12 +857,7 @@ export default function powerlineFooter(pi: ExtensionAPI) {
     if (ctx.hasUI) {
       // Extract recent agent context from session for richer vibe generation
       const agentContext = getRecentAgentContext(ctx);
-      onVibeToolCall(
-        event.toolName,
-        event.input,
-        ctx.ui.setWorkingMessage,
-        agentContext,
-      );
+      onVibeToolCall(event.toolName, event.input, ctx.ui.setWorkingMessage, agentContext);
     }
   });
 
@@ -983,11 +911,7 @@ export default function powerlineFooter(pi: ExtensionAPI) {
     persistStashHistory(stashedPromptHistory);
   }
 
-  function copyTextToClipboard(
-    ctx: any,
-    text: string,
-    successMessage?: string,
-  ): void {
+  function copyTextToClipboard(ctx: any, text: string, successMessage?: string): void {
     copyToClipboard(text);
     if (successMessage) {
       ctx.ui.notify(successMessage, "info");
@@ -1004,9 +928,7 @@ export default function powerlineFooter(pi: ExtensionAPI) {
     return null;
   }
 
-  async function selectStashedPromptFromHistory(
-    ctx: any,
-  ): Promise<string | null> {
+  async function selectStashedPromptFromHistory(ctx: any): Promise<string | null> {
     const historyItems = [...stashedPromptHistory];
     const items: SelectItem[] = historyItems.map((entry, index) => ({
       value: String(index),
@@ -1026,10 +948,7 @@ export default function powerlineFooter(pi: ExtensionAPI) {
     return historyItems[i] ?? null;
   }
 
-  async function insertSelectedStash(
-    ctx: any,
-    selected: string,
-  ): Promise<void> {
+  async function insertSelectedStash(ctx: any, selected: string): Promise<void> {
     const currentText = getCurrentEditorText(ctx, currentEditor);
     if (!hasNonWhitespaceText(currentText)) {
       ctx.ui.setEditorText(selected);
@@ -1037,11 +956,7 @@ export default function powerlineFooter(pi: ExtensionAPI) {
       return;
     }
 
-    const action = await ctx.ui.select("Insert stashed prompt", [
-      "Replace",
-      "Append",
-      "Cancel",
-    ]);
+    const action = await ctx.ui.select("Insert stashed prompt", ["Replace", "Append", "Cancel"]);
 
     if (action === "Replace") {
       ctx.ui.setEditorText(selected);
@@ -1050,8 +965,7 @@ export default function powerlineFooter(pi: ExtensionAPI) {
     }
 
     if (action === "Append") {
-      const separator =
-        currentText.endsWith("\n") || selected.startsWith("\n") ? "" : "\n";
+      const separator = currentText.endsWith("\n") || selected.startsWith("\n") ? "" : "\n";
       ctx.ui.setEditorText(`${currentText}${separator}${selected}`);
       ctx.ui.notify("Appended stashed prompt", "info");
     }
@@ -1069,11 +983,7 @@ export default function powerlineFooter(pi: ExtensionAPI) {
     await insertSelectedStash(ctx, selected);
   }
 
-  async function switchToProfile(
-    ctx: any,
-    profiles: ProfileConfig[],
-    index: number,
-  ): Promise<boolean> {
+  async function switchToProfile(ctx: any, profiles: ProfileConfig[], index: number): Promise<boolean> {
     const profile = profiles[index];
     if (!profile) {
       return false;
@@ -1109,16 +1019,11 @@ export default function powerlineFooter(pi: ExtensionAPI) {
 
   function getProfileLabel(ctx: any, profile: ProfileConfig): string {
     const modelSpec = parseModelSpec(profile.model);
-    const model = modelSpec
-      ? ctx.modelRegistry.find(modelSpec.provider, modelSpec.modelId)
-      : undefined;
+    const model = modelSpec ? ctx.modelRegistry.find(modelSpec.provider, modelSpec.modelId) : undefined;
     return getProfileDisplayName(profile, model?.name);
   }
 
-  async function selectProfileFromList(
-    ctx: any,
-    profiles: ProfileConfig[],
-  ): Promise<number | null> {
+  async function selectProfileFromList(ctx: any, profiles: ProfileConfig[]): Promise<number | null> {
     const activeIndex = getLiveProfileMatchIndex(ctx, profiles);
     const items: SelectItem[] = profiles.map((profile, index) => {
       const num = `#${index + 1}`;
@@ -1144,9 +1049,7 @@ export default function powerlineFooter(pi: ExtensionAPI) {
     return Number.isFinite(i) ? i : null;
   }
 
-  async function pickModelFromRegistry(
-    ctx: any,
-  ): Promise<{ provider: string; id: string; name: string } | null> {
+  async function pickModelFromRegistry(ctx: any): Promise<{ provider: string; id: string; name: string } | null> {
     const available = ctx.modelRegistry.getAvailable();
     if (available.length === 0) {
       ctx.ui.notify("No models available", "warning");
@@ -1175,12 +1078,7 @@ export default function powerlineFooter(pi: ExtensionAPI) {
     }
 
     return ctx.ui.custom(
-      (
-        tui: any,
-        theme: Theme,
-        _keybindings: any,
-        done: (result: ModelEntry | null) => void,
-      ) => {
+      (tui: any, theme: Theme, _keybindings: any, done: (result: ModelEntry | null) => void) => {
         const listTheme = overlaySelectListTheme(theme);
         const border = (text: string) => theme.fg("dim", text);
         const wrapRow = (text: string, innerWidth: number): string => {
@@ -1190,11 +1088,7 @@ export default function powerlineFooter(pi: ExtensionAPI) {
         const searchInput = new Input();
         let searchValue = "";
         let filteredEntries = allEntries;
-        let selectList = new SelectList(
-          entriesToItems(allEntries),
-          Math.min(allEntries.length, 12),
-          listTheme,
-        );
+        let selectList = new SelectList(entriesToItems(allEntries), Math.min(allEntries.length, 12), listTheme);
 
         function wireSelectList() {
           selectList.onSelect = (item) => {
@@ -1206,17 +1100,9 @@ export default function powerlineFooter(pi: ExtensionAPI) {
 
         function applyFilter(query: string) {
           filteredEntries = query
-            ? fuzzyFilter(
-                allEntries,
-                query,
-                (e) => `${e.name} ${e.provider} ${e.id}`,
-              )
+            ? fuzzyFilter(allEntries, query, (e) => `${e.name} ${e.provider} ${e.id}`)
             : allEntries;
-          selectList = new SelectList(
-            entriesToItems(filteredEntries),
-            Math.min(filteredEntries.length, 12),
-            listTheme,
-          );
+          selectList = new SelectList(entriesToItems(filteredEntries), Math.min(filteredEntries.length, 12), listTheme);
           wireSelectList();
         }
 
@@ -1226,12 +1112,7 @@ export default function powerlineFooter(pi: ExtensionAPI) {
             const lines: string[] = [];
 
             lines.push(border(`╭${"─".repeat(innerWidth)}╮`));
-            lines.push(
-              wrapRow(
-                theme.fg("accent", theme.bold("Select model")),
-                innerWidth,
-              ),
-            );
+            lines.push(wrapRow(theme.fg("accent", theme.bold("Select model")), innerWidth));
             lines.push(border(`├${"─".repeat(innerWidth)}┤`));
 
             const searchLine = ` ${theme.fg("muted", "/")} ${searchValue}`;
@@ -1243,12 +1124,7 @@ export default function powerlineFooter(pi: ExtensionAPI) {
             }
 
             lines.push(border(`├${"─".repeat(innerWidth)}┤`));
-            lines.push(
-              wrapRow(
-                theme.fg("dim", "type to filter • enter select • esc cancel"),
-                innerWidth,
-              ),
-            );
+            lines.push(wrapRow(theme.fg("dim", "type to filter • enter select • esc cancel"), innerWidth));
             lines.push(border(`╰${"─".repeat(innerWidth)}╯`));
 
             return lines;
@@ -1283,17 +1159,8 @@ export default function powerlineFooter(pi: ExtensionAPI) {
     );
   }
 
-  async function pickThinkingLevel(
-    ctx: any,
-  ): Promise<ProfileConfig["thinking"] | null> {
-    const levels: ProfileConfig["thinking"][] = [
-      "off",
-      "minimal",
-      "low",
-      "medium",
-      "high",
-      "xhigh",
-    ];
+  async function pickThinkingLevel(ctx: any): Promise<ProfileConfig["thinking"] | null> {
+    const levels: ProfileConfig["thinking"][] = ["off", "minimal", "low", "medium", "high", "xhigh"];
     const items: SelectItem[] = levels.map((level) => ({
       value: level,
       label: level,
@@ -1338,21 +1205,12 @@ export default function powerlineFooter(pi: ExtensionAPI) {
     }
 
     const displayName = label || model.name;
-    ctx.ui.notify(
-      `Added profile #${nextProfiles.length}: ${displayName} [${thinking}]`,
-      "info",
-    );
+    ctx.ui.notify(`Added profile #${nextProfiles.length}: ${displayName} [${thinking}]`, "info");
   }
 
-  async function openProfileList(
-    ctx: any,
-    profiles: ProfileConfig[],
-  ): Promise<void> {
+  async function openProfileList(ctx: any, profiles: ProfileConfig[]): Promise<void> {
     if (profiles.length === 0) {
-      ctx.ui.notify(
-        "No profiles configured. Use /model-switcher add to create one.",
-        "info",
-      );
+      ctx.ui.notify("No profiles configured. Use /model-switcher add to create one.", "info");
       return;
     }
 
@@ -1375,10 +1233,7 @@ export default function powerlineFooter(pi: ExtensionAPI) {
           ctx.ui.setStatus("stash", undefined);
           ctx.ui.notify("Stash restored", "info");
         } else {
-          ctx.ui.notify(
-            "Stash preserved — clear editor then Alt+S to restore",
-            "info",
-          );
+          ctx.ui.notify("Stash preserved — clear editor then Alt+S to restore", "info");
         }
       }
     }
@@ -1460,10 +1315,7 @@ export default function powerlineFooter(pi: ExtensionAPI) {
         if (writePowerlinePresetSetting(preset)) {
           ctx.ui.notify(`Preset set to: ${preset}`, "info");
         } else {
-          ctx.ui.notify(
-            `Preset set to: ${preset} (not persisted; check settings.json)`,
-            "warning",
-          );
+          ctx.ui.notify(`Preset set to: ${preset} (not persisted; check settings.json)`, "warning");
         }
         return;
       }
@@ -1571,8 +1423,7 @@ export default function powerlineFooter(pi: ExtensionAPI) {
 
         const currentMatch = getLiveProfileMatchIndex(ctx, profiles);
 
-        const startIndex =
-          currentMatch !== null ? (currentMatch + 1) % profiles.length : 0;
+        const startIndex = currentMatch !== null ? (currentMatch + 1) % profiles.length : 0;
         for (let attempt = 0; attempt < profiles.length; attempt++) {
           const candidateIndex = (startIndex + attempt) % profiles.length;
           const switched = await switchToProfile(ctx, profiles, candidateIndex);
@@ -1604,8 +1455,7 @@ export default function powerlineFooter(pi: ExtensionAPI) {
   });
 
   pi.registerCommand("model-switcher", {
-    description:
-      "Manage model profiles. Usage: /model-switcher [add|remove|<number>]",
+    description: "Manage model profiles. Usage: /model-switcher [add|remove|<number>]",
     handler: async (args, ctx) => {
       const trimmed = args?.trim() ?? "";
       const profiles = reloadProfiles();
@@ -1628,10 +1478,7 @@ export default function powerlineFooter(pi: ExtensionAPI) {
         // Text-based: /model-switcher add <model> <thinking> [label...]
         const addMatch = trimmed.match(/^add\s+(\S+)\s+(\S+)([\s\S]*)$/i);
         if (!addMatch) {
-          ctx.ui.notify(
-            "Usage: /model-switcher add [<model> <thinking> [label...]]",
-            "error",
-          );
+          ctx.ui.notify("Usage: /model-switcher add [<model> <thinking> [label...]]", "error");
           return;
         }
 
@@ -1642,18 +1489,12 @@ export default function powerlineFooter(pi: ExtensionAPI) {
           return;
         }
         if (!isThinkingLevel(thinking)) {
-          ctx.ui.notify(
-            "Invalid thinking level. Use: off|minimal|low|medium|high|xhigh",
-            "error",
-          );
+          ctx.ui.notify("Invalid thinking level. Use: off|minimal|low|medium|high|xhigh", "error");
           return;
         }
 
         const label = (addMatch[3] ?? "").trim();
-        const nextProfiles: ProfileConfig[] = [
-          ...profiles,
-          { model, thinking, ...(label ? { label } : {}) },
-        ];
+        const nextProfiles: ProfileConfig[] = [...profiles, { model, thinking, ...(label ? { label } : {}) }];
         const saved = saveProfiles(nextProfiles);
         if (!saved) {
           ctx.ui.notify("Failed to save profiles", "warning");
@@ -1671,19 +1512,13 @@ export default function powerlineFooter(pi: ExtensionAPI) {
         }
 
         const indexValue = Number.parseInt(parts[1], 10);
-        if (
-          !Number.isFinite(indexValue) ||
-          indexValue < 1 ||
-          indexValue > profiles.length
-        ) {
+        if (!Number.isFinite(indexValue) || indexValue < 1 || indexValue > profiles.length) {
           ctx.ui.notify("Invalid profile number", "error");
           return;
         }
 
         const removeIndex = indexValue - 1;
-        const nextProfiles = profiles.filter(
-          (_, index) => index !== removeIndex,
-        );
+        const nextProfiles = profiles.filter((_, index) => index !== removeIndex);
         let nextActiveIndex = getActiveProfileIndex();
         if (nextActiveIndex !== null) {
           if (nextActiveIndex === removeIndex) {
@@ -1691,10 +1526,7 @@ export default function powerlineFooter(pi: ExtensionAPI) {
           } else if (removeIndex < nextActiveIndex) {
             nextActiveIndex -= 1;
           }
-          if (
-            nextActiveIndex !== null &&
-            nextActiveIndex >= nextProfiles.length
-          ) {
+          if (nextActiveIndex !== null && nextActiveIndex >= nextProfiles.length) {
             nextActiveIndex = null;
           }
         }
@@ -1732,8 +1564,7 @@ export default function powerlineFooter(pi: ExtensionAPI) {
 
   // Command to set working message theme
   pi.registerCommand("vibe", {
-    description:
-      "Set working message theme. Usage: /vibe [theme|off|mode|model|generate]",
+    description: "Set working message theme. Usage: /vibe [theme|off|mode|model|generate]",
     handler: async (args, ctx) => {
       const parts = args?.trim().split(/\s+/) || [];
       const subcommand = parts[0]?.toLowerCase();
@@ -1746,8 +1577,7 @@ export default function powerlineFooter(pi: ExtensionAPI) {
         let status = `Vibe: ${theme || "off"} | Mode: ${mode} | Model: ${model}`;
         if (theme && mode === "file") {
           const count = getVibeFileCount(theme);
-          status +=
-            count > 0 ? ` | File: ${count} vibes` : " | File: not found";
+          status += count > 0 ? ` | File: ${count} vibes` : " | File: not found";
         }
         ctx.ui.notify(status, "info");
         return;
@@ -1762,20 +1592,14 @@ export default function powerlineFooter(pi: ExtensionAPI) {
         }
         // Validate format (provider/modelId)
         if (!modelSpec.includes("/")) {
-          ctx.ui.notify(
-            "Invalid model format. Use: provider/modelId (e.g., anthropic/claude-haiku-4-5)",
-            "error",
-          );
+          ctx.ui.notify("Invalid model format. Use: provider/modelId (e.g., anthropic/claude-haiku-4-5)", "error");
           return;
         }
         const persisted = setVibeModel(modelSpec);
         if (persisted) {
           ctx.ui.notify(`Vibe model set to: ${modelSpec}`, "info");
         } else {
-          ctx.ui.notify(
-            `Vibe model set to: ${modelSpec} (not persisted; check settings.json)`,
-            "warning",
-          );
+          ctx.ui.notify(`Vibe model set to: ${modelSpec} (not persisted; check settings.json)`, "warning");
         }
         return;
       }
@@ -1794,20 +1618,14 @@ export default function powerlineFooter(pi: ExtensionAPI) {
         // Check if file exists when switching to file mode
         const theme = getVibeTheme();
         if (newMode === "file" && theme && !hasVibeFile(theme)) {
-          ctx.ui.notify(
-            `No vibe file for "${theme}". Run /vibe generate ${theme} first`,
-            "error",
-          );
+          ctx.ui.notify(`No vibe file for "${theme}". Run /vibe generate ${theme} first`, "error");
           return;
         }
         const persisted = setVibeMode(newMode);
         if (persisted) {
           ctx.ui.notify(`Vibe mode set to: ${newMode}`, "info");
         } else {
-          ctx.ui.notify(
-            `Vibe mode set to: ${newMode} (not persisted; check settings.json)`,
-            "warning",
-          );
+          ctx.ui.notify(`Vibe mode set to: ${newMode} (not persisted; check settings.json)`, "warning");
         }
         return;
       }
@@ -1816,9 +1634,7 @@ export default function powerlineFooter(pi: ExtensionAPI) {
       if (subcommand === "generate") {
         const theme = parts[1];
         const parsedCount = Number.parseInt(parts[2] ?? "", 10);
-        const count = Number.isFinite(parsedCount)
-          ? Math.min(Math.max(Math.floor(parsedCount), 1), 500)
-          : 100;
+        const count = Number.isFinite(parsedCount) ? Math.min(Math.max(Math.floor(parsedCount), 1), 500) : 100;
 
         if (!theme) {
           ctx.ui.notify("Usage: /vibe generate <theme> [count]", "error");
@@ -1830,10 +1646,7 @@ export default function powerlineFooter(pi: ExtensionAPI) {
         const result = await generateVibesBatch(theme, count);
 
         if (result.success) {
-          ctx.ui.notify(
-            `Generated ${result.count} vibes for "${theme}" → ${result.filePath}`,
-            "info",
-          );
+          ctx.ui.notify(`Generated ${result.count} vibes for "${theme}" → ${result.filePath}`, "info");
         } else {
           ctx.ui.notify(`Failed to generate vibes: ${result.error}`, "error");
         }
@@ -1846,10 +1659,7 @@ export default function powerlineFooter(pi: ExtensionAPI) {
         if (persisted) {
           ctx.ui.notify("Vibe disabled", "info");
         } else {
-          ctx.ui.notify(
-            "Vibe disabled (not persisted; check settings.json)",
-            "warning",
-          );
+          ctx.ui.notify("Vibe disabled (not persisted; check settings.json)", "warning");
         }
         return;
       }
@@ -1867,10 +1677,7 @@ export default function powerlineFooter(pi: ExtensionAPI) {
       } else if (persisted) {
         ctx.ui.notify(`Vibe set to: ${theme}`, "info");
       } else {
-        ctx.ui.notify(
-          `Vibe set to: ${theme} (not persisted; check settings.json)`,
-          "warning",
-        );
+        ctx.ui.notify(`Vibe set to: ${theme} (not persisted; check settings.json)`, "warning");
       }
     },
   });
@@ -1916,34 +1723,22 @@ export default function powerlineFooter(pi: ExtensionAPI) {
         lastAssistant.usage.cacheWrite
       : 0;
     const contextWindow = ctx.model?.contextWindow || 0;
-    const contextPercent =
-      contextWindow > 0 ? (contextTokens / contextWindow) * 100 : 0;
+    const contextPercent = contextWindow > 0 ? (contextTokens / contextWindow) * 100 : 0;
 
     // Get git status (cached)
     const gitBranch = footerDataRef?.getGitBranch() ?? null;
     const gitStatus = getGitStatus(gitBranch);
 
     // Check if using OAuth subscription
-    const usingSubscription = ctx.model
-      ? (ctx.modelRegistry?.isUsingOAuth?.(ctx.model) ?? false)
-      : false;
+    const usingSubscription = ctx.model ? (ctx.modelRegistry?.isUsingOAuth?.(ctx.model) ?? false) : false;
 
-    const thinkingLevel =
-      thinkingLevelFromSession ?? pi.getThinkingLevel() ?? "off";
+    const thinkingLevel = thinkingLevelFromSession ?? pi.getThinkingLevel() ?? "off";
     const profilesCache = getProfilesCache();
     const activeProfileMatch =
       ctx.model?.provider && ctx.model?.id
-        ? findMatchingProfileIndex(
-            profilesCache,
-            ctx.model.provider,
-            ctx.model.id,
-            thinkingLevel,
-          )
+        ? findMatchingProfileIndex(profilesCache, ctx.model.provider, ctx.model.id, thinkingLevel)
         : null;
-    const activeProfileLabel =
-      activeProfileMatch !== null
-        ? (profilesCache[activeProfileMatch]?.label ?? null)
-        : null;
+    const activeProfileLabel = activeProfileMatch !== null ? (profilesCache[activeProfileMatch]?.label ?? null) : null;
 
     return {
       model: ctx.model,
@@ -1954,8 +1749,7 @@ export default function powerlineFooter(pi: ExtensionAPI) {
       usageStats: { input, output, cacheRead, cacheWrite, cost },
       contextPercent,
       contextWindow,
-      autoCompactEnabled:
-        ctx.settingsManager?.getCompactionSettings?.()?.enabled ?? true,
+      autoCompactEnabled: ctx.settingsManager?.getCompactionSettings?.()?.enabled ?? true,
       usingSubscription,
       sessionStartTime,
       git: gitStatus,
@@ -1970,26 +1764,16 @@ export default function powerlineFooter(pi: ExtensionAPI) {
    * Get cached responsive layout or compute fresh one.
    * Layout is cached per render cycle (same width = same layout).
    */
-  function getResponsiveLayout(
-    width: number,
-    theme: Theme,
-  ): { topContent: string; secondaryContent: string } {
+  function getResponsiveLayout(width: number, theme: Theme): { topContent: string; secondaryContent: string } {
     const now = Date.now();
     // Cache is valid if same width and within 50ms (same render cycle)
-    if (
-      lastLayoutResult &&
-      lastLayoutWidth === width &&
-      now - lastLayoutTimestamp < 50
-    ) {
+    if (lastLayoutResult && lastLayoutWidth === width && now - lastLayoutTimestamp < 50) {
       return lastLayoutResult;
     }
 
     if (config.resolvedPreset.error) {
       const availableWidth = Math.max(1, width - 2);
-      const message = truncateWithEllipsisByWidth(
-        `⚠ ${config.resolvedPreset.error}`,
-        availableWidth,
-      );
+      const message = truncateWithEllipsisByWidth(`⚠ ${config.resolvedPreset.error}`, availableWidth);
       lastLayoutWidth = width;
       lastLayoutResult = {
         topContent: ` ${theme.fg("error", message)} `,
@@ -2019,19 +1803,14 @@ export default function powerlineFooter(pi: ExtensionAPI) {
           return;
         }
 
-        const editorFactory = (
-          tui: any,
-          editorTheme: any,
-          keybindings: any,
-        ) => {
+        const editorFactory = (tui: any, editorTheme: any, keybindings: any) => {
           class PowerlineEditor extends CustomEditor {
             private autocompleteFixed = false;
             private baseAutocompleteProvider: PowerlineEnhancedAutocompleteProvider | null = null;
             private wrappedAutocompleteProvider: PowerlineRuntimeAutocompleteProvider | null = null;
 
             override setAutocompleteProvider(provider: AutocompleteProvider): void {
-              this.baseAutocompleteProvider =
-                provider as PowerlineEnhancedAutocompleteProvider;
+              this.baseAutocompleteProvider = provider as PowerlineEnhancedAutocompleteProvider;
               this.refreshPowerlineAutocompleteProvider();
             }
 
@@ -2071,13 +1850,9 @@ export default function powerlineFooter(pi: ExtensionAPI) {
               this.wrappedAutocompleteProvider?.clearPowerlineAutocompleteState?.();
             }
 
-            applyPowerlineAutocompleteRefresh(
-              request: PowerlineAutocompleteRefreshRequest,
-            ): boolean {
+            applyPowerlineAutocompleteRefresh(request: PowerlineAutocompleteRefreshRequest): boolean {
               const applied =
-                this.wrappedAutocompleteProvider?.applyPowerlineAutocompleteRefreshRequest?.(
-                  request,
-                ) ?? false;
+                this.wrappedAutocompleteProvider?.applyPowerlineAutocompleteRefreshRequest?.(request) ?? false;
               if (!applied) {
                 return false;
               }
@@ -2136,8 +1911,7 @@ export default function powerlineFooter(pi: ExtensionAPI) {
               return originalRender(width);
             }
 
-            const bc = (s: string) =>
-              `${getFgAnsiCode("sep")}${s}${ansi.reset}`;
+            const bc = (s: string) => `${getFgAnsiCode("sep")}${s}${ansi.reset}`;
             const prompt = `${ansi.getFgAnsi(200, 200, 200)}>${ansi.reset}`;
 
             // Content area: 3 chars for prompt prefix (" > " / "   ")
@@ -2201,21 +1975,19 @@ export default function powerlineFooter(pi: ExtensionAPI) {
 
         // Set up footer data provider access (needed for git branch, extension statuses)
         // Status bar is rendered inside the editor override, footer is empty
-        ctx.ui.setFooter(
-          (tui: any, _theme: Theme, footerData: ReadonlyFooterDataProvider) => {
-            footerDataRef = footerData;
-            tuiRef = tui; // Store TUI reference for re-renders on git branch changes
-            const unsub = footerData.onBranchChange(() => tui.requestRender());
+        ctx.ui.setFooter((tui: any, _theme: Theme, footerData: ReadonlyFooterDataProvider) => {
+          footerDataRef = footerData;
+          tuiRef = tui; // Store TUI reference for re-renders on git branch changes
+          const unsub = footerData.onBranchChange(() => tui.requestRender());
 
-            return {
-              dispose: unsub,
-              invalidate() {},
-              render(): string[] {
-                return [];
-              },
-            };
-          },
-        );
+          return {
+            dispose: unsub,
+            invalidate() {},
+            render(): string[] {
+              return [];
+            },
+          };
+        });
 
         ctx.ui.setWidget(
           "powerline-autocomplete-hint",
@@ -2314,10 +2086,7 @@ export default function powerlineFooter(pi: ExtensionAPI) {
                 let promptText = lastUserPrompt.replace(/\s+/g, " ").trim();
                 if (!promptText) return [];
 
-                promptText = truncateWithEllipsisByWidth(
-                  promptText,
-                  availableWidth,
-                );
+                promptText = truncateWithEllipsisByWidth(promptText, availableWidth);
 
                 const styledPrompt = `${getFgAnsiCode("sep")}${promptText}${ansi.reset}`;
                 return [` ${prefix}${styledPrompt}`];
@@ -2328,10 +2097,7 @@ export default function powerlineFooter(pi: ExtensionAPI) {
         );
       })
       .catch((error) => {
-        console.debug(
-          "[powerline-footer] Failed to initialize custom editor:",
-          error,
-        );
+        console.debug("[powerline-footer] Failed to initialize custom editor:", error);
       });
   }
 
@@ -2341,12 +2107,7 @@ export default function powerlineFooter(pi: ExtensionAPI) {
     const loadedCounts = discoverLoadedCounts();
     const recentSessions = getRecentSessions(3);
 
-    const header = new WelcomeHeader(
-      modelName,
-      providerName,
-      recentSessions,
-      loadedCounts,
-    );
+    const header = new WelcomeHeader(modelName, providerName, recentSessions, loadedCounts);
     welcomeHeaderActive = true; // Will be cleared on first user input
 
     ctx.ui.setHeader(() => {
@@ -2393,18 +2154,8 @@ export default function powerlineFooter(pi: ExtensionAPI) {
 
       ctx.ui
         .custom(
-          (
-            tui: any,
-            _theme: any,
-            _keybindings: any,
-            done: (result: void) => void,
-          ) => {
-            const welcome = new WelcomeComponent(
-              modelName,
-              providerName,
-              recentSessions,
-              loadedCounts,
-            );
+          (tui: any, _theme: any, _keybindings: any, done: (result: void) => void) => {
+            const welcome = new WelcomeComponent(modelName, providerName, recentSessions, loadedCounts);
 
             let countdown = 30;
             let dismissed = false;

@@ -52,20 +52,31 @@ describe("custom segment registry", () => {
   });
 
   test("registerSegment rejects duplicate ids", () => {
-    registerSegment({
-      id: "verbosity",
-      render: () => ({ content: "low", visible: true }),
-    }, "test:one");
+    registerSegment(
+      {
+        id: "verbosity",
+        render: () => ({ content: "low", visible: true }),
+      },
+      "test:one",
+    );
 
-    expect(() => registerSegment({
-      id: "verbosity",
-      render: () => ({ content: "high", visible: true }),
-    }, "test:two")).toThrow(/already registered/i);
+    expect(() =>
+      registerSegment(
+        {
+          id: "verbosity",
+          render: () => ({ content: "high", visible: true }),
+        },
+        "test:two",
+      ),
+    ).toThrow(/already registered/i);
   });
 
   test("loads direct ts/js entrypoints through registerSegment api", async () => {
     const dir = createTempSegmentsDir();
-    writeFile(dir, "verbosity.ts", `
+    writeFile(
+      dir,
+      "verbosity.ts",
+      `
       export default function ({ registerSegment }) {
         registerSegment({
           id: 'Verbosity',
@@ -74,8 +85,12 @@ describe("custom segment registry", () => {
           },
         });
       }
-    `);
-    writeFile(dir, "session-badge.js", `
+    `,
+    );
+    writeFile(
+      dir,
+      "session-badge.js",
+      `
       export default function ({ registerSegment }) {
         registerSegment({
           id: 'session_badge',
@@ -84,7 +99,8 @@ describe("custom segment registry", () => {
           },
         });
       }
-    `);
+    `,
+    );
 
     const result = await loadSegmentsFromDirectory(dir);
 
@@ -94,10 +110,12 @@ describe("custom segment registry", () => {
       content: "low",
       visible: true,
     });
-    expect(renderSegment("session_badge", {
-      ...createSegmentContext(),
-      sessionId: "abcdef12",
-    })).toEqual({
+    expect(
+      renderSegment("session_badge", {
+        ...createSegmentContext(),
+        sessionId: "abcdef12",
+      }),
+    ).toEqual({
       content: "#abcd",
       visible: true,
     });
@@ -105,13 +123,24 @@ describe("custom segment registry", () => {
 
   test("loads package manifests and supports multi-segment packages", async () => {
     const dir = createTempSegmentsDir();
-    writeFile(dir, "toolbox/package.json", JSON.stringify({
-      name: "toolbox",
-      pi: {
-        segments: ["./src/index.ts"],
-      },
-    }, null, 2));
-    writeFile(dir, "toolbox/src/index.ts", `
+    writeFile(
+      dir,
+      "toolbox/package.json",
+      JSON.stringify(
+        {
+          name: "toolbox",
+          pi: {
+            segments: ["./src/index.ts"],
+          },
+        },
+        null,
+        2,
+      ),
+    );
+    writeFile(
+      dir,
+      "toolbox/src/index.ts",
+      `
       import { suffix } from './label.ts';
       export default function ({ registerSegment }) {
         registerSegment({
@@ -127,10 +156,15 @@ describe("custom segment registry", () => {
           },
         });
       }
-    `);
-    writeFile(dir, "toolbox/src/label.ts", `
+    `,
+    );
+    writeFile(
+      dir,
+      "toolbox/src/label.ts",
+      `
       export const suffix = '-helper';
-    `);
+    `,
+    );
 
     const result = await loadSegmentsFromDirectory(dir);
 
@@ -148,13 +182,24 @@ describe("custom segment registry", () => {
 
   test("supports package-local node_modules resolution", async () => {
     const dir = createTempSegmentsDir();
-    writeFile(dir, "deps/package.json", JSON.stringify({
-      name: "deps-segment",
-      pi: {
-        segments: ["./src/index.ts"],
-      },
-    }, null, 2));
-    writeFile(dir, "deps/src/index.ts", `
+    writeFile(
+      dir,
+      "deps/package.json",
+      JSON.stringify(
+        {
+          name: "deps-segment",
+          pi: {
+            segments: ["./src/index.ts"],
+          },
+        },
+        null,
+        2,
+      ),
+    );
+    writeFile(
+      dir,
+      "deps/src/index.ts",
+      `
       import label from 'tiny-label';
       export default function ({ registerSegment }) {
         registerSegment({
@@ -164,12 +209,21 @@ describe("custom segment registry", () => {
           },
         });
       }
-    `);
-    writeFile(dir, "deps/node_modules/tiny-label/package.json", JSON.stringify({
-      name: "tiny-label",
-      version: "1.0.0",
-      main: "./index.js",
-    }, null, 2));
+    `,
+    );
+    writeFile(
+      dir,
+      "deps/node_modules/tiny-label/package.json",
+      JSON.stringify(
+        {
+          name: "tiny-label",
+          version: "1.0.0",
+          main: "./index.js",
+        },
+        null,
+        2,
+      ),
+    );
     writeFile(dir, "deps/node_modules/tiny-label/index.js", `module.exports = 'dep-ok';`);
 
     const result = await loadSegmentsFromDirectory(dir);
@@ -183,7 +237,11 @@ describe("custom segment registry", () => {
 
   test("reports entrypoints that do not export a default factory", async () => {
     const dir = createTempSegmentsDir();
-    writeFile(dir, "broken.ts", `export default { id: 'broken', render() { return { content: 'x', visible: true }; } };`);
+    writeFile(
+      dir,
+      "broken.ts",
+      `export default { id: 'broken', render() { return { content: 'x', visible: true }; } };`,
+    );
 
     const result = await loadSegmentsFromDirectory(dir);
 
@@ -195,12 +253,16 @@ describe("custom segment registry", () => {
 
   test("reports duplicate registrations from the same package", async () => {
     const dir = createTempSegmentsDir();
-    writeFile(dir, "dupe.ts", `
+    writeFile(
+      dir,
+      "dupe.ts",
+      `
       export default function ({ registerSegment }) {
         registerSegment({ id: 'dup', render() { return { content: 'one', visible: true }; } });
         registerSegment({ id: 'dup', render() { return { content: 'two', visible: true }; } });
       }
-    `);
+    `,
+    );
 
     const result = await loadSegmentsFromDirectory(dir);
 
@@ -211,12 +273,15 @@ describe("custom segment registry", () => {
   });
 
   test("resolution order is file then programmatic then built-in", async () => {
-    registerSegment({
-      id: "path",
-      render() {
-        return { content: "programmatic-path", visible: true };
+    registerSegment(
+      {
+        id: "path",
+        render() {
+          return { content: "programmatic-path", visible: true };
+        },
       },
-    }, "test:programmatic-path");
+      "test:programmatic-path",
+    );
 
     expect(renderSegment("path", createSegmentContext())).toEqual({
       content: "programmatic-path",
@@ -224,7 +289,10 @@ describe("custom segment registry", () => {
     });
 
     const dir = createTempSegmentsDir();
-    writeFile(dir, "path.ts", `
+    writeFile(
+      dir,
+      "path.ts",
+      `
       export default function ({ registerSegment }) {
         registerSegment({
           id: 'path',
@@ -233,7 +301,8 @@ describe("custom segment registry", () => {
           },
         });
       }
-    `);
+    `,
+    );
 
     const result = await loadSegmentsFromDirectory(dir);
     expect(result.errors).toEqual([]);

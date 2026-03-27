@@ -24,7 +24,7 @@ let branchInvalidationCounter = 0;
 
 /**
  * Parse git status --porcelain output
- * 
+ *
  * Format: XY filename
  * X = index status, Y = working tree status
  * ?? = untracked
@@ -160,8 +160,8 @@ export function getGitStatus(providerBranch: string | null): GitStatus {
 
   // Return cached if fresh
   if (cachedStatus && now - cachedStatus.timestamp < CACHE_TTL_MS) {
-    return { 
-      branch, 
+    return {
+      branch,
       staged: cachedStatus.staged,
       unstaged: cachedStatus.unstaged,
       untracked: cachedStatus.untracked,
@@ -184,8 +184,8 @@ export function getGitStatus(providerBranch: string | null): GitStatus {
 
   // Return last cached or empty
   if (cachedStatus) {
-    return { 
-      branch, 
+    return {
+      branch,
       staged: cachedStatus.staged,
       unstaged: cachedStatus.unstaged,
       untracked: cachedStatus.untracked,

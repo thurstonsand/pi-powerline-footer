@@ -59,7 +59,7 @@
 ## [0.4.4] - 2026-03-19
 
 ### Removed
-- Dropped npm `bin` installer shim and removed `cli.js`; package now targets `pi install npm:pi-powerline-footer` as the only install path.
+- Dropped npm `bin` installer shim and removed `cli.js`; package now targets `pi install npm:@thurstonsand/pi-powerline-footer` as the only install path.
 
 ## [0.4.3] - 2026-03-19
 

@@ -31,7 +31,7 @@ Customizes the default [pi](https://github.com/badlogic/pi-mono) editor with a p
 ## Installation
 
 ```bash
-pi install npm:pi-powerline-footer
+pi install npm:@thurstonsand/pi-powerline-footer
 ```
 
 Restart pi to activate.
@@ -197,7 +197,7 @@ export default function ({ registerSegment }) {
 
 A single entrypoint can register as many segments as it wants.
 
-If you want to register a segment from code instead of disk, import `registerSegment()` from `pi-powerline-footer` and use the same registration shape.
+If you want to register a segment from code instead of disk, import `registerSegment()` from `@thurstonsand/pi-powerline-footer` and use the same registration shape.
 
 ## Autocomplete bridge for other extensions
 
@@ -223,7 +223,7 @@ Example:
 import {
   connectPowerlineAutocompleteExtension,
   type PowerlineAutocompleteEnhancer,
-} from "pi-powerline-footer";
+} from "@thurstonsand/pi-powerline-footer";
 
 const enhancers: PowerlineAutocompleteEnhancer[] = [
   {
@@ -296,7 +296,7 @@ For typed custom segments, the package root exports:
 Example:
 
 ```ts
-import type { SegmentContext, SegmentLoaderAPI, StatusLineSegment } from "pi-powerline-footer";
+import type { SegmentContext, SegmentLoaderAPI, StatusLineSegment } from "@thurstonsand/pi-powerline-footer";
 
 const segment: StatusLineSegment<{ label?: string }> = {
   id: "example",
