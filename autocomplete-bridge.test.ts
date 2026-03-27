@@ -13,7 +13,7 @@ import { createAutocompleteRegistry } from "./autocomplete-registry.js";
 
 function createProvider(label: string): AutocompleteProvider {
   return {
-    getSuggestions(): { items: AutocompleteItem[]; prefix: string } | null {
+    async getSuggestions(): Promise<{ items: AutocompleteItem[]; prefix: string } | null> {
       return { items: [{ value: label, label }], prefix: label };
     },
     applyCompletion(lines, cursorLine, cursorCol) {
@@ -50,8 +50,12 @@ describe("autocomplete bridge", () => {
 
     expect(registry.getRegisteredEnhancers().map((enhancer) => enhancer.id)).toEqual(["sessions"]);
     expect(
-      registry.getRegisteredEnhancers()[0]?.enhance(createProvider("base")).getSuggestions([], 0, 0)
-        ?.prefix,
+      (
+        await registry
+          .getRegisteredEnhancers()[0]
+          ?.enhance(createProvider("base"))
+          .getSuggestions([], 0, 0, createAutocompleteOptions())
+      )?.prefix,
     ).toBe("sessions");
 
     disposeExtension();
@@ -131,8 +135,12 @@ describe("autocomplete bridge", () => {
 
     expect(registry.getRegisteredEnhancers()).toHaveLength(1);
     expect(
-      registry.getRegisteredEnhancers()[0]?.enhance(createProvider("base")).getSuggestions([], 0, 0)
-        ?.prefix,
+      (
+        await registry
+          .getRegisteredEnhancers()[0]
+          ?.enhance(createProvider("base"))
+          .getSuggestions([], 0, 0, createAutocompleteOptions())
+      )?.prefix,
     ).toBe("new");
 
     firstConnection();
@@ -167,3 +175,9 @@ describe("autocomplete bridge", () => {
     expect(POWERLINE_AUTOCOMPLETE_PROTOCOL_VERSION).toBe(1);
   });
 });
+
+function createAutocompleteOptions(): { signal: AbortSignal } {
+  return {
+    signal: new AbortController().signal,
+  };
+}

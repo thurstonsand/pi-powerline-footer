@@ -231,8 +231,8 @@ const enhancers: PowerlineAutocompleteEnhancer[] = [
     trigger: { prefixes: ["@session", "@session:"] },
     enhance(baseProvider) {
       return {
-        getSuggestions(lines, cursorLine, cursorCol) {
-          const base = baseProvider.getSuggestions(lines, cursorLine, cursorCol);
+        async getSuggestions(lines, cursorLine, cursorCol, options) {
+          const base = await baseProvider.getSuggestions(lines, cursorLine, cursorCol, options);
           return {
             prefix: "@session",
             items: [
