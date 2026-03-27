@@ -208,10 +208,14 @@ Current supported path: **external extensions connect over `pi.events`**.
 The package root exports:
 
 - `connectPowerlineAutocompleteExtension(...)`
+- `createPowerlineAutocompleteInteractionHandle(...)`
+- `queryPowerlineAutocompleteState(...)`
+- `requestPowerlineAutocompleteRefresh(...)`
 - `POWERLINE_AUTOCOMPLETE_EVENTS`
 - `POWERLINE_AUTOCOMPLETE_PROTOCOL_VERSION`
 - `PowerlineAutocompleteEnhancer`
 - `PowerlineAutocompleteEnhancerTrigger`
+- `PowerlineEnhancedAutocompleteProvider`
 
 Example:
 
@@ -265,6 +269,16 @@ How it works:
 This keeps Pi's native autocomplete UI and file/slash completion behavior intact while letting external extensions layer custom provider logic on top.
 
 Enhancers can also return an optional `getPowerlineAutocompleteHint()` method on the wrapped provider. Powerline renders that hint below the editor only while Pi's autocomplete list is visible.
+
+For live interaction while autocomplete is open, Powerline also exposes a small event/RPC coordination surface:
+
+- Powerline emits active/inactive lifecycle events for installed autocomplete contributions
+- consumers can build an interaction handle from the installed id returned by the register RPC
+- consumers can request an open-autocomplete refresh, optionally with provider-specific data payloads
+- Powerline forwards the refresh payload to the active provider instance through `setPowerlineAutocompleteData(...)` when that optional method exists
+- `queryPowerlineAutocompleteState(...)` is available for defensive state resync, though many consumers will not need it in the normal path
+
+This keeps Powerline responsible for editor ownership, refresh mechanics, and visibility lifecycle while leaving consumer-specific shortcut semantics and payload data in the consumer extension.
 
 **Current scope:** cross-extension autocomplete over `pi.events` is supported now. File-based local autocomplete entrypoints under `~/.pi/agent/powerline/autocomplete/` are planned later and are not part of the current release surface.
 

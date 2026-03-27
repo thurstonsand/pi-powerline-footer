@@ -3,17 +3,20 @@ import type {
   PowerlineAutocompleteEnhancerTrigger,
 } from "./types.js";
 
-export interface HostedAutocompleteEnhancer {
+export interface InstalledPowerlineAutocompleteEnhancer {
+  id: string;
   extensionId: string;
   enhancer: PowerlineAutocompleteEnhancer;
-  hostedId: string;
 }
 
 export interface AutocompleteRegistry {
   getRegisteredEnhancers(): readonly PowerlineAutocompleteEnhancer[];
-  getHostedEnhancers(): readonly HostedAutocompleteEnhancer[];
-  upsertHostedEnhancer(extensionId: string, enhancer: PowerlineAutocompleteEnhancer): HostedAutocompleteEnhancer;
-  removeHostedEnhancer(extensionId: string, enhancerId: string): void;
+  getInstalledEnhancers(): readonly InstalledPowerlineAutocompleteEnhancer[];
+  upsertInstalledEnhancer(
+    extensionId: string,
+    enhancer: PowerlineAutocompleteEnhancer,
+  ): InstalledPowerlineAutocompleteEnhancer;
+  removeInstalledEnhancer(extensionId: string, enhancerId: string): void;
   subscribe(listener: () => void): () => void;
 }
 
@@ -26,11 +29,11 @@ function normalizeTriggerPrefixes(prefixes?: string[]): string[] | undefined {
     return undefined;
   }
 
-  const normalized = Array.from(new Set(
-    prefixes
-      .map((value) => value.trim())
-      .filter((value) => value.length > 0),
-  ));
+  const normalized = Array.from(
+    new Set(
+      prefixes.map((value) => value.trim()).filter((value) => value.length > 0),
+    ),
+  );
 
   return normalized.length > 0 ? normalized : undefined;
 }
@@ -62,72 +65,80 @@ function normalizeEnhancer(enhancer: PowerlineAutocompleteEnhancer): PowerlineAu
     throw new Error("autocomplete enhancer id must be a non-empty string");
   }
 
+  const trigger = normalizeTrigger(enhancer.trigger);
+  if (trigger) {
+    return {
+      id,
+      trigger,
+      enhance: enhancer.enhance,
+    };
+  }
+
   return {
     id,
-    trigger: normalizeTrigger(enhancer.trigger),
     enhance: enhancer.enhance,
   };
 }
 
-function createHostedId(extensionId: string, enhancerId: string): string {
+function installedId(extensionId: string, enhancerId: string): string {
   return `${extensionId}::${enhancerId}`;
 }
 
 export function createAutocompleteRegistry(): AutocompleteRegistry {
-  const hostedEnhancers: HostedAutocompleteEnhancer[] = [];
+  const installedEnhancers: InstalledPowerlineAutocompleteEnhancer[] = [];
   const listeners = new Set<() => void>();
 
-  const emitChange = () => {
+  function emitChange(): void {
     for (const listener of listeners) {
       listener();
     }
-  };
+  }
 
   return {
     getRegisteredEnhancers() {
-      return hostedEnhancers.map((entry) => entry.enhancer);
+      return installedEnhancers.map((entry) => entry.enhancer);
     },
 
-    getHostedEnhancers() {
-      return [...hostedEnhancers];
+    getInstalledEnhancers() {
+      return [...installedEnhancers];
     },
 
-    upsertHostedEnhancer(extensionId, enhancer) {
+    upsertInstalledEnhancer(extensionId, enhancer) {
       const normalizedExtensionId = normalizeId(extensionId);
       if (!normalizedExtensionId) {
         throw new Error("autocomplete enhancer extension id must be a non-empty string");
       }
 
       const normalizedEnhancer = normalizeEnhancer(enhancer);
-      const hostedId = createHostedId(normalizedExtensionId, normalizedEnhancer.id);
-      const nextEntry: HostedAutocompleteEnhancer = {
+      const id = installedId(normalizedExtensionId, normalizedEnhancer.id);
+      const nextEntry: InstalledPowerlineAutocompleteEnhancer = {
+        id,
         extensionId: normalizedExtensionId,
         enhancer: normalizedEnhancer,
-        hostedId,
       };
-      const index = hostedEnhancers.findIndex((entry) => entry.hostedId === hostedId);
+      const index = installedEnhancers.findIndex((entry) => entry.id === id);
 
       if (index >= 0) {
-        hostedEnhancers[index] = nextEntry;
+        installedEnhancers[index] = nextEntry;
       } else {
-        hostedEnhancers.push(nextEntry);
+        installedEnhancers.push(nextEntry);
       }
 
       emitChange();
       return nextEntry;
     },
 
-    removeHostedEnhancer(extensionId, enhancerId) {
+    removeInstalledEnhancer(extensionId, enhancerId) {
       const normalizedExtensionId = normalizeId(extensionId);
       const normalizedEnhancerId = normalizeId(enhancerId);
       if (!normalizedExtensionId || !normalizedEnhancerId) {
         return;
       }
 
-      const hostedId = createHostedId(normalizedExtensionId, normalizedEnhancerId);
-      const index = hostedEnhancers.findIndex((entry) => entry.hostedId === hostedId);
+      const id = installedId(normalizedExtensionId, normalizedEnhancerId);
+      const index = installedEnhancers.findIndex((entry) => entry.id === id);
       if (index >= 0) {
-        hostedEnhancers.splice(index, 1);
+        installedEnhancers.splice(index, 1);
         emitChange();
       }
     },
@@ -179,7 +190,7 @@ export function shouldActivateAutocompleteEnhancer(
     return true;
   }
 
-  if (typeof trigger.shouldActivate === "function") {
+  if (trigger.shouldActivate) {
     return trigger.shouldActivate(lines, cursorLine, cursorCol);
   }
 

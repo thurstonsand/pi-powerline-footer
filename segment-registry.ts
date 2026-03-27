@@ -9,6 +9,7 @@ import type {
   BuiltinStatusLineSegmentId,
   RenderedSegment,
   SegmentContext,
+  SegmentLoaderAPI,
   StatusLineSegment,
   StatusLineSegmentId,
 } from "./types.js";
@@ -30,10 +31,6 @@ export interface SegmentLoadResult {
 interface SegmentEntrypoint {
   source: string;
   filePath: string;
-}
-
-interface SegmentLoaderAPI {
-  registerSegment(segment: unknown): StatusLineSegment;
 }
 
 function normalizeSegmentId(id: unknown): string | null {
@@ -197,8 +194,8 @@ async function loadSegmentEntrypoint(entrypoint: SegmentEntrypoint): Promise<str
 
   const loadedIds: string[] = [];
   const api: SegmentLoaderAPI = {
-    registerSegment(segment: unknown): StatusLineSegment {
-      const registered = registerLoadedSegment(segment, entrypoint.source);
+    registerSegment(segment) {
+      const registered = registerLoadedSegment(segment as unknown, entrypoint.source);
       loadedIds.push(registered.id);
       return registered;
     },

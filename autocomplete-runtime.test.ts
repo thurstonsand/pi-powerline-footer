@@ -1,3 +1,4 @@
+import { createEventBus, type EventBus } from "@mariozechner/pi-coding-agent";
 import type {
   AutocompleteItem,
   AutocompleteProvider,
@@ -6,16 +7,19 @@ import type {
 import { describe, expect, test } from "vitest";
 
 import { createAutocompleteRegistry } from "./autocomplete-registry.js";
+import { POWERLINE_AUTOCOMPLETE_EVENTS } from "./autocomplete-bridge.js";
 import {
+  createPowerlineAutocompleteInteractionHandle,
   createRuntimeAutocompleteProvider,
   getVisiblePowerlineAutocompleteHint,
   installRuntimeAutocompleteEnhancerIntegration,
+  requestPowerlineAutocompleteRefresh,
   type PowerlineAutocompleteHintEditor,
   type PowerlineAutocompleteSuggestions,
-  type PowerlineRuntimeAutocompleteProvider,
+  type PowerlineEnhancedAutocompleteProvider,
 } from "./autocomplete-runtime.js";
 
-function createRuntimeBaseProvider(): PowerlineRuntimeAutocompleteProvider {
+function createRuntimeBaseProvider(): PowerlineEnhancedAutocompleteProvider {
   return {
     getSuggestions(lines, cursorLine, cursorCol) {
       const line = lines[cursorLine] ?? "";
@@ -63,12 +67,13 @@ function wrapProvider(baseProvider: AutocompleteProvider, suffix: string): Autoc
 }
 
 class FakeRuntimeEditor implements PowerlineAutocompleteHintEditor {
-  autocompleteProvider?: PowerlineRuntimeAutocompleteProvider;
+  autocompleteProvider?: PowerlineEnhancedAutocompleteProvider;
   getPowerlineAutocompleteHint?: () => string | undefined;
+  clearPowerlineAutocompleteState?: () => void;
   private showingAutocomplete = false;
 
   setAutocompleteProvider(provider: AutocompleteProvider): void {
-    this.autocompleteProvider = provider as PowerlineRuntimeAutocompleteProvider;
+    this.autocompleteProvider = provider as PowerlineEnhancedAutocompleteProvider;
   }
 
   isShowingAutocomplete(): boolean {
@@ -85,14 +90,14 @@ describe("runtime autocomplete provider", () => {
     const registry = createAutocompleteRegistry();
     const trace: string[] = [];
 
-    registry.upsertHostedEnhancer("always", {
+    registry.upsertInstalledEnhancer("always", {
       id: "always",
       enhance(baseProvider) {
         trace.push("always");
         return wrapProvider(baseProvider, "always");
       },
     });
-    registry.upsertHostedEnhancer("sessions", {
+    registry.upsertInstalledEnhancer("sessions", {
       id: "sessions",
       trigger: { prefixes: ["@session", "@session:"] },
       enhance(baseProvider) {
@@ -100,7 +105,7 @@ describe("runtime autocomplete provider", () => {
         return wrapProvider(baseProvider, "sessions");
       },
     });
-    registry.upsertHostedEnhancer("hash-sessions", {
+    registry.upsertInstalledEnhancer("hash-sessions", {
       id: "hash-sessions",
       trigger: { prefixes: ["#session"] },
       enhance(baseProvider) {
@@ -122,13 +127,19 @@ describe("runtime autocomplete provider", () => {
       { value: "picked", label: "picked" },
       sessionSuggestions?.prefix ?? "",
     );
-    expect(sessionCompletion.lines[0]).toBe(`${sessionLine} -> picked via @session:abc|always|sessions|always|sessions`);
+    expect(sessionCompletion.lines[0]).toBe(
+      `${sessionLine} -> picked via @session:abc|always|sessions|always|sessions`,
+    );
 
     const hashLine = "open #session";
-    expect(provider.getSuggestions([hashLine], 0, hashLine.length)?.prefix).toBe("#session|always|hash");
+    expect(provider.getSuggestions([hashLine], 0, hashLine.length)?.prefix).toBe(
+      "#session|always|hash",
+    );
 
     const plainLine = "open plain";
-    expect(provider.getSuggestions([plainLine], 0, plainLine.length)?.prefix).toBe("plain|always");
+    expect(provider.getSuggestions([plainLine], 0, plainLine.length)?.prefix).toBe(
+      "plain|always",
+    );
 
     expect(trace).toEqual(["always", "sessions", "always", "hash", "always"]);
   });
@@ -136,7 +147,7 @@ describe("runtime autocomplete provider", () => {
   test("preserves Pi file-completion methods and base hint when enhancers only wrap suggestions", () => {
     const registry = createAutocompleteRegistry();
 
-    registry.upsertHostedEnhancer("sessions", {
+    registry.upsertInstalledEnhancer("sessions", {
       id: "sessions",
       trigger: { prefixes: ["@session"] },
       enhance(baseProvider) {
@@ -144,12 +155,15 @@ describe("runtime autocomplete provider", () => {
       },
     });
 
-    const provider = createRuntimeAutocompleteProvider({
-      ...createRuntimeBaseProvider(),
-      getPowerlineAutocompleteHint() {
-        return "base hint";
+    const provider = createRuntimeAutocompleteProvider(
+      {
+        ...createRuntimeBaseProvider(),
+        getPowerlineAutocompleteHint() {
+          return "base hint";
+        },
       },
-    }, registry);
+      registry,
+    );
     const line = "open @session";
 
     expect(provider.getSuggestions([line], 0, line.length)?.prefix).toBe("@session|sessions");
@@ -178,8 +192,9 @@ describe("runtime autocomplete provider", () => {
     const registry = createAutocompleteRegistry();
     const editor = new FakeRuntimeEditor();
     let hint = "Ctrl+A: show all sessions";
+    let cleared = false;
 
-    registry.upsertHostedEnhancer("sessions", {
+    registry.upsertInstalledEnhancer("sessions", {
       id: "sessions",
       trigger: { prefixes: ["@session", "@session:"] },
       enhance(baseProvider) {
@@ -187,6 +202,9 @@ describe("runtime autocomplete provider", () => {
           ...wrapProvider(baseProvider, "sessions"),
           getPowerlineAutocompleteHint() {
             return hint;
+          },
+          clearPowerlineAutocompleteState() {
+            cleared = true;
           },
         };
       },
@@ -197,17 +215,64 @@ describe("runtime autocomplete provider", () => {
     editor.setShowingAutocomplete(true);
 
     const sessionLine = "open @session:abc";
-    expect(editor.autocompleteProvider?.getSuggestions([sessionLine], 0, sessionLine.length)?.prefix).toBe("@session:abc|sessions");
+    expect(editor.autocompleteProvider?.getSuggestions([sessionLine], 0, sessionLine.length)?.prefix).toBe(
+      "@session:abc|sessions",
+    );
     expect(getVisiblePowerlineAutocompleteHint(editor)).toBe("Ctrl+A: show all sessions");
 
     hint = "Ctrl+A: show only direct lineage";
-    expect(getVisiblePowerlineAutocompleteHint(editor)).toBe("Ctrl+A: show only direct lineage");
+    expect(getVisiblePowerlineAutocompleteHint(editor)).toBe(
+      "Ctrl+A: show only direct lineage",
+    );
+
+    editor.clearPowerlineAutocompleteState?.();
+    expect(cleared).toBe(true);
 
     const plainLine = "open plain";
-    expect(editor.autocompleteProvider?.getSuggestions([plainLine], 0, plainLine.length)?.prefix).toBe("plain");
+    expect(editor.autocompleteProvider?.getSuggestions([plainLine], 0, plainLine.length)?.prefix).toBe(
+      "plain",
+    );
     expect(getVisiblePowerlineAutocompleteHint(editor)).toBeUndefined();
 
     editor.setShowingAutocomplete(false);
     expect(getVisiblePowerlineAutocompleteHint(editor)).toBeUndefined();
+  });
+
+  test("exposes a generic interaction handle driven by lifecycle events", () => {
+    const events: EventBus = createEventBus();
+    const installedId = "pi-sessions::sessions";
+    const interaction = createPowerlineAutocompleteInteractionHandle(events, installedId);
+
+    expect(interaction.isActive()).toBe(false);
+
+    const activePayload = {
+      installedId,
+      extensionId: "pi-sessions",
+      enhancerId: "sessions",
+    };
+    events.emit(POWERLINE_AUTOCOMPLETE_EVENTS.state.active, activePayload);
+    expect(interaction.isActive()).toBe(true);
+
+    const inactivePayload = {
+      ...activePayload,
+      reason: "autocomplete_closed" as const,
+    };
+    events.emit(POWERLINE_AUTOCOMPLETE_EVENTS.state.inactive, inactivePayload);
+    expect(interaction.isActive()).toBe(false);
+
+    interaction.disconnect();
+  });
+
+  test("emits refresh requests over the event bus", () => {
+    const events: EventBus = createEventBus();
+    const installedId = "pi-sessions::sessions";
+    const received: string[] = [];
+
+    events.on(POWERLINE_AUTOCOMPLETE_EVENTS.ui.refresh, () => {
+      received.push("refresh");
+    });
+
+    requestPowerlineAutocompleteRefresh(events, installedId);
+    expect(received).toEqual(["refresh"]);
   });
 });
