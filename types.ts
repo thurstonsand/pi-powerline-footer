@@ -214,6 +214,10 @@ export interface StatusLineSegment<TOptions = unknown> {
   render(ctx: SegmentContext, options?: TOptions): RenderedSegment;
 }
 
+export interface SegmentLoaderAPI {
+  registerSegment<TOptions = unknown>(segment: StatusLineSegment<TOptions>): StatusLineSegment<TOptions>;
+}
+
 export interface PowerlineAutocompleteEnhancerTrigger {
   prefixes?: string[];
   shouldActivate?(lines: string[], cursorLine: number, cursorCol: number): boolean;

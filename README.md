@@ -153,10 +153,14 @@ Powerline owns the editor when enabled, but other extensions can add autocomplet
 The package root exports:
 
 - `connectPowerlineAutocompleteExtension(...)`
+- `createPowerlineAutocompleteInteractionHandle(...)`
+- `queryPowerlineAutocompleteState(...)`
+- `requestPowerlineAutocompleteRefresh(...)`
 - `POWERLINE_AUTOCOMPLETE_EVENTS`
 - `POWERLINE_AUTOCOMPLETE_PROTOCOL_VERSION`
 - `PowerlineAutocompleteEnhancer`
 - `PowerlineAutocompleteEnhancerTrigger`
+- `PowerlineEnhancedAutocompleteProvider`
 
 Example:
 
@@ -204,6 +208,14 @@ Powerline hosts the enhancer registry and re-wraps pi's base autocomplete provid
 
 Enhancers can also return an optional `getPowerlineAutocompleteHint()` method on the wrapped provider. Powerline renders that hint below the editor only while Pi's autocomplete list is visible.
 
+For live interaction while autocomplete is open, Powerline also exposes a small event/RPC coordination surface:
+
+- active/inactive lifecycle events for installed autocomplete contributions
+- `createPowerlineAutocompleteInteractionHandle(...)`
+- `requestPowerlineAutocompleteRefresh(...)`
+- `queryPowerlineAutocompleteState(...)`
+
+**Current scope:** cross-extension autocomplete over `pi.events` is supported now. File-based local autocomplete entrypoints under `~/.pi/agent/powerline/autocomplete/` are planned later and are not part of the current release surface.
 ## Editor Stash
 
 Use `Alt+S` as a quick stash toggle while drafting. It keeps one active stash and clears the editor when stashing.

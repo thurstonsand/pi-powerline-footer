@@ -1,14 +1,13 @@
-import type {
-  AutocompleteItem,
-  AutocompleteProvider,
-} from "@mariozechner/pi-tui";
 import { createEventBus, type EventBus } from "@mariozechner/pi-coding-agent";
+import type { AutocompleteItem, AutocompleteProvider } from "@mariozechner/pi-tui";
 import { describe, expect, test } from "vitest";
 
 import {
   connectPowerlineAutocompleteExtension,
-  POWERLINE_AUTOCOMPLETE_PROTOCOL_VERSION,
   installPowerlineAutocompleteBridge,
+  POWERLINE_AUTOCOMPLETE_EVENTS,
+  POWERLINE_AUTOCOMPLETE_PROTOCOL_VERSION,
+  queryPowerlineAutocompleteState,
 } from "./autocomplete-bridge.js";
 import { createAutocompleteRegistry } from "./autocomplete-registry.js";
 
@@ -32,29 +31,34 @@ describe("autocomplete bridge", () => {
     const events: EventBus = createEventBus();
     const registry = createAutocompleteRegistry();
 
-    const disposeHost = installPowerlineAutocompleteBridge(events, registry);
+    const bridge = installPowerlineAutocompleteBridge(events, registry);
     const disposeExtension = connectPowerlineAutocompleteExtension(events, {
       extension: { id: "pi-sessions", version: "1.0.0" },
-      enhancers: [{
-        id: "sessions",
-        trigger: { prefixes: ["@session"] },
-        enhance() {
-          return createProvider("sessions");
+      enhancers: [
+        {
+          id: "sessions",
+          trigger: { prefixes: ["@session"] },
+          enhance() {
+            return createProvider("sessions");
+          },
         },
-      }],
+      ],
       pingTimeoutMs: 20,
     });
 
     await flush(5);
 
     expect(registry.getRegisteredEnhancers().map((enhancer) => enhancer.id)).toEqual(["sessions"]);
-    expect(registry.getRegisteredEnhancers()[0]?.enhance(createProvider("base")).getSuggestions([], 0, 0)?.prefix).toBe("sessions");
+    expect(
+      registry.getRegisteredEnhancers()[0]?.enhance(createProvider("base")).getSuggestions([], 0, 0)
+        ?.prefix,
+    ).toBe("sessions");
 
     disposeExtension();
     await flush(5);
     expect(registry.getRegisteredEnhancers()).toHaveLength(0);
 
-    disposeHost();
+    bridge.dispose();
   });
 
   test("ready broadcast recovers when extension loads before Powerline host without waiting for timeout", async () => {
@@ -64,12 +68,14 @@ describe("autocomplete bridge", () => {
 
     const disposeExtension = connectPowerlineAutocompleteExtension(events, {
       extension: { id: "pi-sessions" },
-      enhancers: [{
-        id: "sessions",
-        enhance() {
-          return createProvider("sessions");
+      enhancers: [
+        {
+          id: "sessions",
+          enhance() {
+            return createProvider("sessions");
+          },
         },
-      }],
+      ],
       pingTimeoutMs: 20,
       debug(event) {
         debugEvents.push(event.type);
@@ -79,7 +85,7 @@ describe("autocomplete bridge", () => {
     await flush(5);
     expect(registry.getRegisteredEnhancers()).toHaveLength(0);
 
-    const disposeHost = installPowerlineAutocompleteBridge(events, registry);
+    const bridge = installPowerlineAutocompleteBridge(events, registry);
     await flush(10);
 
     expect(registry.getRegisteredEnhancers().map((enhancer) => enhancer.id)).toEqual(["sessions"]);
@@ -87,44 +93,74 @@ describe("autocomplete bridge", () => {
     expect(debugEvents).not.toContain("rpc:ping:timeout");
 
     disposeExtension();
-    disposeHost();
+    bridge.dispose();
   });
 
   test("same extension and enhancer id replace in place over the bridge", async () => {
     const events: EventBus = createEventBus();
     const registry = createAutocompleteRegistry();
 
-    const disposeHost = installPowerlineAutocompleteBridge(events, registry);
+    const bridge = installPowerlineAutocompleteBridge(events, registry);
     const firstConnection = connectPowerlineAutocompleteExtension(events, {
       extension: { id: "pi-sessions" },
-      enhancers: [{
-        id: "sessions",
-        enhance() {
-          return createProvider("old");
+      enhancers: [
+        {
+          id: "sessions",
+          enhance() {
+            return createProvider("old");
+          },
         },
-      }],
+      ],
       pingTimeoutMs: 20,
     });
     await flush(5);
 
     const secondConnection = connectPowerlineAutocompleteExtension(events, {
       extension: { id: "pi-sessions" },
-      enhancers: [{
-        id: "sessions",
-        enhance() {
-          return createProvider("new");
+      enhancers: [
+        {
+          id: "sessions",
+          enhance() {
+            return createProvider("new");
+          },
         },
-      }],
+      ],
       pingTimeoutMs: 20,
     });
     await flush(5);
 
     expect(registry.getRegisteredEnhancers()).toHaveLength(1);
-    expect(registry.getRegisteredEnhancers()[0]?.enhance(createProvider("base")).getSuggestions([], 0, 0)?.prefix).toBe("new");
+    expect(
+      registry.getRegisteredEnhancers()[0]?.enhance(createProvider("base")).getSuggestions([], 0, 0)
+        ?.prefix,
+    ).toBe("new");
 
     firstConnection();
     secondConnection();
-    disposeHost();
+    bridge.dispose();
+  });
+
+  test("reports active installed autocomplete state over rpc", async () => {
+    const events: EventBus = createEventBus();
+    const registry = createAutocompleteRegistry();
+
+    const bridge = installPowerlineAutocompleteBridge(events, registry);
+    events.emit(POWERLINE_AUTOCOMPLETE_EVENTS.state.active, {
+      installedId: "pi-sessions::sessions",
+      extensionId: "pi-sessions",
+      enhancerId: "sessions",
+    });
+
+    await expect(
+      queryPowerlineAutocompleteState(events, "pi-sessions::sessions", 20),
+    ).resolves.toBe(true);
+    await expect(queryPowerlineAutocompleteState(events, "pi-sessions::missing", 20)).resolves.toBe(
+      false,
+    );
+    expect(bridge.isActiveInstalledAutocomplete("pi-sessions::sessions")).toBe(true);
+    expect(bridge.isActiveInstalledAutocomplete("pi-sessions::missing")).toBe(false);
+
+    bridge.dispose();
   });
 
   test("exports the current protocol version", () => {

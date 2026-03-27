@@ -3,8 +3,17 @@
   "version": "0.4.8",
   "description": "Powerline-style status bar extension for pi coding agent",
   "type": "module",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./index.ts"
+    }
+  },
   "scripts": {
-    "test": "vitest --run"
+    "test": "vitest --run",
+    "build:types": "tsc -p tsconfig.types.json",
+    "prepare": "npm run build:types"
   },
   "dependencies": {
     "@mariozechner/jiti": "^2.6.2"
@@ -20,7 +29,8 @@
   "files": [
     "*.ts",
     "*.md",
-    "*.json"
+    "*.json",
+    "dist/**/*.d.ts"
   ],
   "keywords": [
     "pi-package",
