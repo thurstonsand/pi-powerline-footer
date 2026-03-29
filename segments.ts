@@ -2,13 +2,15 @@ import { hostname as osHostname } from "node:os";
 import { basename } from "node:path";
 import { visibleWidth } from "@mariozechner/pi-tui";
 import type {
-  BuiltinStatusLineSegmentId,
+  BuiltinSegmentId,
+  GitSegmentOptions,
+  ModelSegmentOptions,
+  PathSegmentOptions,
   RenderedSegment,
   SegmentContext,
   SemanticColor,
   StatusLineSegment,
-  StatusLineSegmentId,
-  StatusLineSegmentOptions,
+  TimeSegmentOptions,
 } from "./types.js";
 import { fg, rainbow, applyColor } from "./theme.js";
 import { getIcons, SEP_DOT, getThinkingText } from "./icons.js";
@@ -47,11 +49,6 @@ function formatDuration(ms: number): string {
 // ═══════════════════════════════════════════════════════════════════════════
 // Segment Implementations
 // ═══════════════════════════════════════════════════════════════════════════
-
-type ModelSegmentOptions = NonNullable<StatusLineSegmentOptions["model"]>;
-type PathSegmentOptions = NonNullable<StatusLineSegmentOptions["path"]>;
-type GitSegmentOptions = NonNullable<StatusLineSegmentOptions["git"]>;
-type TimeSegmentOptions = NonNullable<StatusLineSegmentOptions["time"]>;
 
 const piSegment: StatusLineSegment = {
   id: "pi",
@@ -146,8 +143,8 @@ const gitSegment: StatusLineSegment<GitSegmentOptions> = {
     const icons = getIcons();
     const opts = options ?? {};
     const { branch, staged, unstaged, untracked } = ctx.git;
-    const gitStatus = (staged > 0 || unstaged > 0 || untracked > 0) 
-      ? { staged, unstaged, untracked } 
+    const gitStatus = (staged > 0 || unstaged > 0 || untracked > 0)
+      ? { staged, unstaged, untracked }
       : null;
 
     if (!branch && !gitStatus) return { content: "", visible: false };
@@ -441,7 +438,7 @@ const extensionStatusesSegment: StatusLineSegment = {
 // Segment Registry
 // ═══════════════════════════════════════════════════════════════════════════
 
-export const SEGMENTS: Record<BuiltinStatusLineSegmentId, StatusLineSegment> = {
+export const BUILTIN_SEGMENTS: Record<BuiltinSegmentId, StatusLineSegment> = {
   pi: piSegment,
   model: modelSegment,
   path: pathSegment,
@@ -463,10 +460,3 @@ export const SEGMENTS: Record<BuiltinStatusLineSegmentId, StatusLineSegment> = {
   extension_statuses: extensionStatusesSegment,
 };
 
-export function renderSegment(id: StatusLineSegmentId, ctx: SegmentContext): RenderedSegment {
-  const segment = SEGMENTS[id];
-  if (!segment) {
-    return { content: "", visible: false };
-  }
-  return segment.render(ctx, ctx.options[id]);
-}

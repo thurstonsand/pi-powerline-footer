@@ -22,7 +22,7 @@ Customizes the default [pi](https://github.com/badlogic/pi-mono) editor with a p
 
 **Smart defaults** — Nerd Font auto-detection for iTerm, WezTerm, Kitty, Ghostty, and Alacritty with ASCII fallbacks. Colors matched to oh-my-pi's dark theme.
 
-**Git integration** — Async status fetching with 1s cache TTL. Automatically invalidates on file writes/edits. Shows branch, staged (+), unstaged (\*), and untracked (?) counts.
+**Git integration** — Async status fetching with 1s cache TTL. Automatically invalidates on file writes/edits. Shows branch, staged (+), unstaged (*), and untracked (?) counts.
 
 **Context awareness** — Color-coded warnings at 70% (yellow) and 90% (red) context usage. Auto-compact indicator when enabled.
 
@@ -40,15 +40,15 @@ Restart pi to activate.
 
 Activates automatically. Toggle with `/powerline`, switch presets with `/powerline <name>`.
 
-| Preset    | Description                                                  |
-| --------- | ------------------------------------------------------------ |
+| Preset | Description |
+|--------|-------------|
 | `default` | Model, thinking, path (basename), git, context, tokens, cost |
-| `minimal` | Just path (basename), git, context                           |
-| `compact` | Model, git, cost, context                                    |
-| `full`    | Everything including hostname, time, abbreviated path        |
-| `nerd`    | Maximum detail for Nerd Font users                           |
-| `ascii`   | Safe for any terminal                                        |
-| `custom`  | User-defined layout from `powerline.custom`                  |
+| `minimal` | Just path (basename), git, context |
+| `compact` | Model, git, cost, context |
+| `full` | Everything including hostname, time, abbreviated path |
+| `nerd` | Maximum detail for Nerd Font users |
+| `ascii` | Safe for any terminal |
+| `custom` | User-defined layout from `powerline.custom` |
 
 **Environment:** `POWERLINE_NERD_FONTS=1` to force Nerd Fonts, `=0` for ASCII.
 
@@ -57,7 +57,7 @@ Run `/powerline default` to switch back to the default preset.
 
 ### Custom preset
 
-`custom` resolves its layout from `powerline.custom` and uses the same layout path as the built-in presets.
+`custom` resolves its layout from `powerline.custom`.
 
 ```json
 {
@@ -69,7 +69,6 @@ Run `/powerline default` to switch back to the default preset.
       "rightSegments": ["time", "context_pct"],
       "secondarySegments": ["extension_statuses"],
       "options": {
-        "model": { "showThinkingLevel": true },
         "path": { "mode": "abbreviated", "maxLength": 40 },
         "git": {
           "showBranch": true,
@@ -84,43 +83,51 @@ Run `/powerline default` to switch back to the default preset.
 }
 ```
 
-Custom preset arrays can use built-in segment ids from **Segments** below plus any custom segment ids loaded from `~/.pi/agent/powerline/segments/` or registered programmatically. `separator` uses one of the names from **Separators**.
+`leftSegments` and `rightSegments` are appended in order into the main status row; `rightSegments` does not right-align to the edge of the terminal.
+
+`secondarySegments` render in the row below the editor.
+
+Segment arrays can include built-in segment ids plus any custom segment ids loaded from `~/.pi/agent/powerline/segments/`.
 
 ### Custom segments
 
-Powerline discovers segment entrypoints from:
+Custom segments are loaded from:
 
 ```text
 ~/.pi/agent/powerline/segments/
 ```
 
-Discovery follows the same general shape as pi extensions:
+Supported entrypoints:
 
-- direct files: `*.ts`, `*.js`
-- directories with `index.ts` or `index.js`
+- `*.ts` / `*.js`
+- directories with `index.ts` / `index.js`
 - directories with `package.json` and `pi.segments`
 
-Entrypoints are loaded through `jiti`. That means TypeScript works directly, and segment packages can use their own `node_modules` after running `npm install` in that package.
+Segments are loaded through `jiti`, so TypeScript works directly and package-style segments can use local `node_modules`. After adding or changing a segment, run `/reload`.
 
-After adding or changing a segment file there, run `/reload`.
+Set segment-specific options in `powerline.custom.options.<segment-id>`. They are passed as the second argument to `render(ctx, options)`.
 
-Example single-file segment `~/.pi/agent/powerline/segments/verbosity.ts`:
+Example:
 
 ```ts
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
 export default function ({ registerSegment }) {
   registerSegment({
-    id: "verbosity",
+    id: "dev_note",
     render(_ctx, options) {
+      const file = join(process.env.PI_CODING_AGENT_DIR, "powerline-note.txt");
+      const text = readFileSync(file, "utf-8").trim();
+
       return {
-        content: `🗣 ${options?.label ?? "low"}`,
+        content: `${options?.prefix ?? ""}${text || "note empty"}`,
         visible: true,
       };
     },
   });
 }
 ```
-
-Then reference it from `powerline.custom` like any other segment:
 
 ```json
 {
@@ -128,86 +135,14 @@ Then reference it from `powerline.custom` like any other segment:
     "preset": "custom",
     "custom": {
       "separator": "powerline-thin",
-      "leftSegments": ["model", "verbosity", "path"],
-      "rightSegments": ["context_pct"],
+      "leftSegments": ["dev_note", "path"],
+      "rightSegments": [],
       "secondarySegments": [],
       "options": {
-        "verbosity": { "label": "low" }
+        "dev_note": { "prefix": "note: " }
       }
     }
   }
-}
-```
-
-A multi-file segment package can live in its own folder:
-
-```text
-~/.pi/agent/powerline/segments/task-badge/
-├── package.json
-├── src/
-│   ├── index.ts
-│   └── format.ts
-└── node_modules/
-```
-
-```json
-{
-  "name": "task-badge",
-  "pi": {
-    "segments": ["./src/index.ts"]
-  }
-}
-```
-
-```ts
-// src/index.ts
-import { formatTask } from "./format";
-
-export default function ({ registerSegment }) {
-  registerSegment({
-    id: "task_badge",
-    render(ctx) {
-      return {
-        content: formatTask(ctx.sessionId),
-        visible: true,
-      };
-    },
-  });
-}
-```
-
-A single entrypoint can register as many segments as it wants.
-
-If you want to register a segment from code instead of disk, import `registerSegment()` from `pi-powerline-footer` and use the same registration shape.
-
-#### Custom segment TypeScript API
-
-For typed custom segments, the package root exports:
-
-- `SegmentContext`
-- `StatusLineSegment`
-- `RenderedSegment`
-- `StatusLineSegmentId`
-- `StatusLineSegmentOptions`
-- `SegmentLoaderAPI`
-
-Example:
-
-```ts
-import type { SegmentContext, SegmentLoaderAPI, StatusLineSegment } from "pi-powerline-footer";
-
-const segment: StatusLineSegment<{ label?: string }> = {
-  id: "example",
-  render(ctx: SegmentContext, options) {
-    return {
-      content: options?.label ?? ctx.model?.id ?? "none",
-      visible: true,
-    };
-  },
-};
-
-export default function ({ registerSegment }: SegmentLoaderAPI) {
-  registerSegment(segment);
 }
 ```
 
@@ -215,12 +150,12 @@ export default function ({ registerSegment }: SegmentLoaderAPI) {
 
 Use `Alt+S` as a quick stash toggle while drafting. It keeps one active stash and clears the editor when stashing.
 
-| Editor   | Stash     | `Alt+S` result                               |
-| -------- | --------- | -------------------------------------------- |
-| Has text | Empty     | Stash current text, clear editor             |
-| Empty    | Has stash | Restore stash into editor                    |
+| Editor | Stash | `Alt+S` result |
+|--------|-------|----------------|
+| Has text | Empty | Stash current text, clear editor |
+| Empty | Has stash | Restore stash into editor |
 | Has text | Has stash | Update stash with current text, clear editor |
-| Empty    | Empty     | Show "Nothing to stash"                      |
+| Empty | Empty | Show "Nothing to stash" |
 
 Auto-restore after an agent run only happens when the editor is still empty. If you typed meanwhile, the stash is preserved.
 
@@ -275,11 +210,7 @@ Model profiles are saved model + thinking combinations stored in `~/.pi/agent/se
 {
   "powerline": {
     "profiles": [
-      {
-        "model": "anthropic/claude-opus-4.6",
-        "thinking": "xhigh",
-        "label": "Opus Deep"
-      },
+      { "model": "anthropic/claude-opus-4.6", "thinking": "xhigh", "label": "Opus Deep" },
       { "model": "openai/codex-5.3", "thinking": "low", "label": "Codex Fast" },
       { "model": "google/gemini-3-pro", "thinking": "medium" }
     ]
@@ -347,13 +278,12 @@ In `~/.pi/agent/settings.json`:
 
 ### Modes
 
-| Mode       | Description                       | Pros                              | Cons                          |
-| ---------- | --------------------------------- | --------------------------------- | ----------------------------- |
-| `generate` | On-demand AI generation (default) | Contextual, hints at actual task  | ~$0.000015/msg, 500ms latency |
-| `file`     | Pull from pre-generated file      | Instant, zero cost, works offline | Not contextual                |
+| Mode | Description | Pros | Cons |
+|------|-------------|------|------|
+| `generate` | On-demand AI generation (default) | Contextual, hints at actual task | ~$0.000015/msg, 500ms latency |
+| `file` | Pull from pre-generated file | Instant, zero cost, works offline | Not contextual |
 
 **File mode setup:**
-
 ```bash
 /vibe generate mafia 200    # Generate 200 vibes, save to ~/.pi/agent/vibes/mafia.txt
 /vibe mode file             # Switch to file mode
@@ -361,20 +291,17 @@ In `~/.pi/agent/settings.json`:
 ```
 
 **How file mode works:**
-
 1. Vibes are loaded from `~/.pi/agent/vibes/{theme}.txt` into memory
 2. Uses seeded shuffle (Mulberry32 PRNG) — cycles through all vibes before repeating
 3. New seed each session — different order every time you restart pi
 4. Zero latency, zero cost, works offline
 
 **Prompt template variables (generate mode only):**
-
 - `{theme}` — the current vibe theme (e.g., "star trek", "mafia")
 - `{task}` — context hint (user prompt initially, then agent's response text or tool info on refresh)
 - `{exclude}` — recent vibes to avoid (auto-populated, e.g., "Don't use: vibe1, vibe2...")
 
 **How it works:**
-
 1. When you send a message, shows "Channeling {theme}..." placeholder
 2. AI generates a themed message in the background (3s timeout)
 3. Message updates to the themed version (e.g., "Engaging warp drive...")
@@ -385,30 +312,30 @@ In `~/.pi/agent/settings.json`:
 
 The thinking segment shows live updates when you change thinking level:
 
-| Level   | Display          | Color       |
-| ------- | ---------------- | ----------- |
-| off     | `thinking:off`   | gray        |
-| minimal | `thinking:min`   | purple-gray |
-| low     | `thinking:low`   | blue        |
-| medium  | `thinking:med`   | teal        |
-| high    | `thinking:high`  | 🌈 rainbow  |
-| xhigh   | `thinking:xhigh` | 🌈 rainbow  |
+| Level | Display | Color |
+|-------|---------|-------|
+| off | `thinking:off` | gray |
+| minimal | `thinking:min` | purple-gray |
+| low | `thinking:low` | blue |
+| medium | `thinking:med` | teal |
+| high | `thinking:high` | 🌈 rainbow |
+| xhigh | `thinking:xhigh` | 🌈 rainbow |
 
 ## Path Display
 
 The path segment supports three modes:
 
-| Mode          | Example                                   | Description                                      |
-| ------------- | ----------------------------------------- | ------------------------------------------------ |
-| `basename`    | `powerline-footer`                        | Just the directory name (default)                |
-| `abbreviated` | `…/extensions/powerline-footer`           | Full path with home abbreviated and length limit |
-| `full`        | `~/.pi/agent/extensions/powerline-footer` | Complete path with home abbreviated              |
+| Mode | Example | Description |
+|------|---------|-------------|
+| `basename` | `powerline-footer` | Just the directory name (default) |
+| `abbreviated` | `…/extensions/powerline-footer` | Full path with home abbreviated and length limit |
+| `full` | `~/.pi/agent/extensions/powerline-footer` | Complete path with home abbreviated |
 
 Configure via preset options: `path: { mode: "full" }`
 
 ## Segments
 
-`pi` · `model` · `thinking` · `path` · `git` · `subagents` · `token_in` · `token_out` · `token_total` · `cost` · `context_pct` · `context_total` · `time_spent` · `time` · `session` · `hostname` · `cache_read` · `cache_write` · `extension_statuses`
+`pi` · `model` · `thinking` · `path` · `git` · `subagents` · `token_in` · `token_out` · `token_total` · `cost` · `context_pct` · `context_total` · `time_spent` · `time` · `session` · `hostname` · `cache_read` · `cache_write`
 
 ## Separators
 
@@ -420,19 +347,19 @@ Colors are configurable via pi's theme system. Each preset defines its own color
 
 ### Default Colors
 
-| Semantic       | Theme Color | Description        |
-| -------------- | ----------- | ------------------ |
-| `pi`           | `accent`    | Pi icon            |
-| `model`        | `#d787af`   | Model name         |
-| `path`         | `#00afaf`   | Directory path     |
-| `gitClean`     | `success`   | Git branch (clean) |
-| `gitDirty`     | `warning`   | Git branch (dirty) |
-| `thinking`     | `muted`     | Thinking level     |
-| `context`      | `dim`       | Context usage      |
-| `contextWarn`  | `warning`   | Context usage >70% |
-| `contextError` | `error`     | Context usage >90% |
-| `cost`         | `text`      | Cost display       |
-| `tokens`       | `muted`     | Token counts       |
+| Semantic | Theme Color | Description |
+|----------|-------------|-------------|
+| `pi` | `accent` | Pi icon |
+| `model` | `#d787af` | Model name |
+| `path` | `#00afaf` | Directory path |
+| `gitClean` | `success` | Git branch (clean) |
+| `gitDirty` | `warning` | Git branch (dirty) |
+| `thinking` | `muted` | Thinking level |
+| `context` | `dim` | Context usage |
+| `contextWarn` | `warning` | Context usage >70% |
+| `contextError` | `error` | Context usage >90% |
+| `cost` | `text` | Cost display |
+| `tokens` | `muted` | Token counts |
 
 ### Custom Theme Override
 
@@ -450,70 +377,7 @@ Create `~/.pi/agent/extensions/powerline-footer/theme.json`:
 ```
 
 Colors can be:
-
 - **Theme color names**: `accent`, `muted`, `dim`, `text`, `success`, `warning`, `error`, `border`, `borderAccent`, `borderMuted`
 - **Hex colors**: `#ff5500`, `#d787af`
 
 See `theme.example.json` for all available options.
-
-## Migrate existing settings
-
-If you're moving from the older top-level config style, consolidate those fields under `powerline`.
-
-Before:
-
-```json
-{
-  "powerline": "nerd",
-  "showLastPrompt": false,
-  "powerlineShortcuts": {
-    "stashHistory": "ctrl+alt+h",
-    "copyEditor": "ctrl+alt+c",
-    "cutEditor": "ctrl+alt+x",
-    "profileCycle": "alt+shift+tab",
-    "profileSelect": "ctrl+alt+m"
-  },
-  "modelProfiles": [
-    { "model": "anthropic/claude-opus-4.6", "thinking": "xhigh", "label": "Opus Deep" }
-  ],
-  "workingVibe": "star trek",
-  "workingVibeMode": "generate",
-  "workingVibeModel": "anthropic/claude-haiku-4-5",
-  "workingVibeFallback": "Working",
-  "workingVibeRefreshInterval": 30,
-  "workingVibePrompt": "Generate a {theme} loading message for: {task}",
-  "workingVibeMaxLength": 65
-}
-```
-
-After:
-
-```json
-{
-  "powerline": {
-    "preset": "nerd",
-    "showLastPrompt": false,
-    "shortcuts": {
-      "stashHistory": "ctrl+alt+h",
-      "copyEditor": "ctrl+alt+c",
-      "cutEditor": "ctrl+alt+x",
-      "profileCycle": "alt+shift+tab",
-      "profileSelect": "ctrl+alt+m"
-    },
-    "profiles": [
-      { "model": "anthropic/claude-opus-4.6", "thinking": "xhigh", "label": "Opus Deep" }
-    ],
-    "vibe": {
-      "theme": "star trek",
-      "mode": "generate",
-      "model": "anthropic/claude-haiku-4-5",
-      "fallback": "Working",
-      "refreshInterval": 30,
-      "prompt": "Generate a {theme} loading message for: {task}",
-      "maxLength": 65
-    }
-  }
-}
-```
-
-For now, the old keys still load, but new docs and examples use the nested `powerline` shape.

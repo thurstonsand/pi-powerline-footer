@@ -94,20 +94,7 @@ describe("resolveCustomPresetSettings", () => {
     expect(result.error).toBe("powerline.custom must be an object");
   });
 
-  test("falls back to empty options for invalid options shapes", () => {
-    const result = resolveCustomPresetSettings({
-      separator: "powerline-thin",
-      leftSegments: ["model"],
-      rightSegments: [],
-      secondarySegments: [],
-      options: true,
-    });
-
-    expect(result.error).toBeUndefined();
-    expect(result.value?.options).toEqual({});
-  });
-
-  test("normalizes option keys to match normalized segment ids", () => {
+  test("passes custom preset settings through as-is", () => {
     const result = resolveCustomPresetSettings({
       separator: "powerline-thin",
       leftSegments: ["VERBOSITY"],
@@ -119,9 +106,14 @@ describe("resolveCustomPresetSettings", () => {
     });
 
     expect(result.error).toBeUndefined();
-    expect(result.value?.leftSegments).toEqual(["verbosity"]);
-    expect(result.value?.options).toEqual({
-      verbosity: { label: "low" },
+    expect(result.value).toEqual({
+      separator: "powerline-thin",
+      leftSegments: ["VERBOSITY"],
+      rightSegments: [],
+      secondarySegments: [],
+      options: {
+        Verbosity: { label: "low" },
+      },
     });
   });
 });

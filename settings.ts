@@ -3,10 +3,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
 import type { PowerlineSettings, PowerlineVibeSettings, StatusLinePreset } from "./types.js";
-import { normalizeCustomSettings } from "./custom.js";
-import { hasOwn, isRecord } from "./json.js";
-
-export const POWERLINE_PACKAGE_NAME = "pi-powerline-footer";
+import { isRecord } from "./json.js";
 
 interface LegacyPowerlineSettings {
   powerline?: unknown;
@@ -22,10 +19,10 @@ interface LegacyPowerlineSettings {
   workingVibeMaxLength?: unknown;
 }
 
-export const LEGACY_POWERLINE_PROFILE_KEY = "modelProfiles";
-export const LEGACY_POWERLINE_SHORTCUTS_KEY = "powerlineShortcuts";
-export const LEGACY_POWERLINE_SHOW_LAST_PROMPT_KEY = "showLastPrompt";
-export const LEGACY_POWERLINE_VIBE_KEYS = [
+const LEGACY_POWERLINE_PROFILE_KEY = "modelProfiles";
+const LEGACY_POWERLINE_SHORTCUTS_KEY = "powerlineShortcuts";
+const LEGACY_POWERLINE_SHOW_LAST_PROMPT_KEY = "showLastPrompt";
+const LEGACY_POWERLINE_VIBE_KEYS = [
   "workingVibe",
   "workingVibeMode",
   "workingVibeModel",
@@ -41,7 +38,7 @@ const LEGACY_POWERLINE_KEYS = [
   ...LEGACY_POWERLINE_VIBE_KEYS,
 ] as const;
 
-export function getSettingsPath(): string {
+function getSettingsPath(): string {
   return join(getAgentDir(), "settings.json");
 }
 
@@ -66,7 +63,7 @@ export function readSettings(logPrefix: string = "powerline-footer"): Record<str
   }
 }
 
-export function readSettingsForWrite(logPrefix: string, scope: string): Record<string, unknown> | null {
+function readSettingsForWrite(logPrefix: string, scope: string): Record<string, unknown> | null {
   const settingsPath = getSettingsPath();
 
   if (!existsSync(settingsPath)) {
@@ -87,7 +84,7 @@ export function readSettingsForWrite(logPrefix: string, scope: string): Record<s
   }
 }
 
-export function persistSettings(settings: Record<string, unknown>, logPrefix: string, scope: string): boolean {
+function persistSettings(settings: Record<string, unknown>, logPrefix: string, scope: string): boolean {
   const settingsPath = getSettingsPath();
 
   try {
@@ -102,7 +99,7 @@ export function persistSettings(settings: Record<string, unknown>, logPrefix: st
 
 const VALID_PRESET_NAMES: StatusLinePreset[] = ["default", "minimal", "compact", "full", "nerd", "ascii", "custom"];
 
-export function isValidPreset(value: unknown): value is StatusLinePreset {
+function isValidPreset(value: unknown): value is StatusLinePreset {
   return typeof value === "string" && VALID_PRESET_NAMES.includes(value as StatusLinePreset);
 }
 
@@ -137,7 +134,7 @@ function backfill(target: Record<string, unknown>, source: Record<string, unknow
   }
 }
 
-export function migrateLegacyPowerlineSettings(rawSettings: Record<string, unknown>): boolean {
+function migrateLegacyPowerlineSettings(rawSettings: Record<string, unknown>): boolean {
   if (!hasLegacyPowerlineSettings(rawSettings)) {
     return false;
   }
@@ -162,6 +159,7 @@ export function migrateLegacyPowerlineSettings(rawSettings: Record<string, unkno
     nextPowerline.profiles = legacy.modelProfiles;
   }
 
+  // Vibe fields: legacy key → nested vibe key
   const vibeMapping: [keyof LegacyPowerlineSettings, string][] = [
     ["workingVibe", "theme"],
     ["workingVibeMode", "mode"],
@@ -242,22 +240,14 @@ export function readPowerlineSettings(rawSettings: Record<string, unknown>): Pow
     settings.vibe = vibe;
   }
 
-  if (powerline && hasOwn(powerline, "custom")) {
-    settings.custom = normalizeCustomSettings(powerline.custom);
+  if (isRecord(powerline?.custom)) {
+    settings.custom = { ...powerline.custom };
   }
 
   return settings;
 }
 
-export function normalizePowerlineSettings(rawSettings: Record<string, unknown>): PowerlineSettings {
-  return readPowerlineSettings(rawSettings);
-}
-
-export function applyPowerlineSettings(
-  rawSettings: Record<string, unknown>,
-  settings: PowerlineSettings,
-  options?: { deleteLegacyKeys?: readonly string[] },
-): void {
+function applyPowerlineSettings(rawSettings: Record<string, unknown>, settings: PowerlineSettings): void {
   const nextPowerline = isRecord(rawSettings.powerline) ? { ...rawSettings.powerline } : {};
 
   if (settings.preset) {
@@ -284,8 +274,8 @@ export function applyPowerlineSettings(
     delete nextPowerline.profiles;
   }
 
-  if (settings.custom !== undefined) {
-    nextPowerline.custom = isRecord(settings.custom) ? { ...settings.custom } : settings.custom;
+  if (settings.custom && isRecord(settings.custom)) {
+    nextPowerline.custom = { ...settings.custom };
   } else {
     delete nextPowerline.custom;
   }
@@ -305,38 +295,6 @@ export function applyPowerlineSettings(
   } else {
     delete rawSettings.powerline;
   }
-
-  for (const key of options?.deleteLegacyKeys ?? []) {
-    delete rawSettings[key];
-  }
-}
-
-export function updatePowerlineSettings(
-  rawSettings: Record<string, unknown>,
-  updater: (settings: PowerlineSettings) => PowerlineSettings,
-  options?: { deleteLegacyKeys?: readonly string[] },
-): PowerlineSettings {
-  const settings = updater(readPowerlineSettings(rawSettings));
-  applyPowerlineSettings(rawSettings, settings, options);
-  return settings;
-}
-
-export function updatePowerlineVibeSettings(
-  rawSettings: Record<string, unknown>,
-  patch: PowerlineVibeSettings,
-  options?: { deleteLegacyKeys?: readonly string[] },
-): PowerlineSettings {
-  return updatePowerlineSettings(
-    rawSettings,
-    (settings) => ({
-      ...settings,
-      vibe: {
-        ...(settings.vibe ?? {}),
-        ...patch,
-      },
-    }),
-    options,
-  );
 }
 
 export function patchPowerlineSetting(

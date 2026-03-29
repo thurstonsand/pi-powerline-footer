@@ -4,17 +4,12 @@
 
 ### Changed
 - Created nested `powerline` config — Settings are now organized under `powerline` as an object, including `preset`, `showLastPrompt`, `shortcuts`, `profiles`, and `vibe`. Legacy top-level keys are migrated into the nested object on start.
-- Settings writes now preserve nested config — Commands like `/powerline`, `/vibe`, and `/model-switcher` now update the nested `powerline` object instead of flattening or overwriting adjacent config.
-- `custom` preset now resolves from `powerline.custom` — The old static `custom` layout has been replaced by a settings-driven preset that flows through the same preset/layout path as the built-in presets. Missing or non-object `powerline.custom` now shows an explicit inline/UI error; other custom values defer to existing runtime fallback behavior.
+- `custom` preset is now settings-driven via `powerline.custom` instead of using a hard-coded layout.
 
 ### Added
-- Migration docs for nested settings — README now includes before/after migration guidance for moving older top-level settings into the new nested `powerline` object.
-- Custom preset docs and tests — Added README coverage for `powerline.custom` plus tests for custom preset normalization, missing custom config errors, and loose runtime fallback behavior for invalid custom values.
-- Custom segment registry and package-style loader — Added `registerSegment()` plus segment discovery from `~/.pi/agent/powerline/segments/` using a pi-extension-style loader powered by `jiti`. Segment entrypoints can be direct `.ts`/`.js` files, directory `index.ts`/`index.js` files, or package manifests with `pi.segments`, and a single entrypoint can register multiple segments.
-- Public custom-segment typing exports — The package root now exports `SegmentContext`, `StatusLineSegment`, `RenderedSegment`, `StatusLineSegmentId`, `StatusLineSegmentOptions`, and `SegmentLoaderAPI` so custom segments can type against the public API without deep imports.
-
-### Changed
 - Builtin segment option typing — `StatusLineSegment` now accepts a typed `options` generic, and builtin segments use their specific option shapes when rendering.
+- Custom segment loading from `~/.pi/agent/powerline/segments/` for `.js` / `.ts` files, directories with `index.js` / `index.ts`, and package-style entries declared through
+ `pi.segments`.
 
 ## [0.4.9] - 2026-04-03
 
