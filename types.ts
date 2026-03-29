@@ -1,7 +1,9 @@
 import type { Theme, ThemeColor } from "@mariozechner/pi-coding-agent";
 
+// Theme color - either a pi theme color name or a custom hex color
 export type ColorValue = ThemeColor | `#${string}`;
 
+// Semantic color names for segments
 export type SemanticColor =
   | "pi"
   | "model"
@@ -17,9 +19,11 @@ export type SemanticColor =
   | "separator"
   | "border";
 
+// Color scheme mapping semantic names to actual colors
 export type ColorScheme = Partial<Record<SemanticColor, ColorValue>>;
 
-export type BuiltinStatusLineSegmentId =
+// Built-in segment identifiers
+export type BuiltinSegmentId =
   | "pi"
   | "model"
   | "path"
@@ -40,7 +44,7 @@ export type BuiltinStatusLineSegmentId =
   | "thinking"
   | "extension_statuses";
 
-export type StatusLineSegmentId = BuiltinStatusLineSegmentId | (string & {});
+// Separator styles
 export type StatusLineSeparatorStyle =
   | "powerline"
   | "powerline-thin"
@@ -53,25 +57,44 @@ export type StatusLineSeparatorStyle =
   | "chevron"
   | "star";
 
-export type StatusLinePreset =
+// Preset names
+export type BuiltinStatusLinePreset =
   | "default"
   | "minimal"
   | "compact"
   | "full"
   | "nerd"
-  | "ascii"
-  | "custom";
+  | "ascii";
 
-export type BuiltinStatusLinePreset = Exclude<StatusLinePreset, "custom">;
+export type StatusLinePreset = BuiltinStatusLinePreset | "custom";
 
+export interface ModelSegmentOptions {
+  showThinkingLevel?: boolean;
+}
+
+export interface PathSegmentOptions {
+  mode?: "basename" | "abbreviated" | "full";
+  maxLength?: number;
+}
+
+export interface GitSegmentOptions {
+  showBranch?: boolean;
+  showStaged?: boolean;
+  showUnstaged?: boolean;
+  showUntracked?: boolean;
+}
+
+export interface TimeSegmentOptions {
+  format?: "12h" | "24h";
+  showSeconds?: boolean;
+}
+
+// Per-segment options
 export interface StatusLineSegmentOptions extends Record<string, unknown> {
-  model?: { showThinkingLevel?: boolean };
-  path?: {
-    mode?: "basename" | "abbreviated" | "full";
-    maxLength?: number;
-  };
-  git?: { showBranch?: boolean; showStaged?: boolean; showUnstaged?: boolean; showUntracked?: boolean };
-  time?: { format?: "12h" | "24h"; showSeconds?: boolean };
+  model?: ModelSegmentOptions;
+  path?: PathSegmentOptions;
+  git?: GitSegmentOptions;
+  time?: TimeSegmentOptions;
 }
 
 export interface PowerlineVibeSettings {
@@ -84,20 +107,23 @@ export interface PowerlineVibeSettings {
   maxLength?: number;
 }
 
-export interface NormalizedCustomPresetSettings {
+export interface CustomPresetSettings {
   separator: StatusLineSeparatorStyle;
-  leftSegments: StatusLineSegmentId[];
-  rightSegments: StatusLineSegmentId[];
-  secondarySegments: StatusLineSegmentId[];
+  leftSegments: string[];
+  rightSegments: string[];
+  secondarySegments: string[];
   options: StatusLineSegmentOptions;
 }
 
+// Preset definition
 export interface PresetDef {
-  leftSegments: StatusLineSegmentId[];
-  rightSegments: StatusLineSegmentId[];
-  secondarySegments?: StatusLineSegmentId[];
+  leftSegments: string[];
+  rightSegments: string[];
+  /** Secondary row segments (shown in footer, above sub bar) */
+  secondarySegments?: string[];
   separator: StatusLineSeparatorStyle;
   segmentOptions?: StatusLineSegmentOptions;
+  /** Color scheme for this preset */
   colors?: ColorScheme;
 }
 
@@ -116,8 +142,7 @@ export interface PowerlineSettings {
   custom?: unknown;
 }
 
-export type NormalizedPowerlineSettings = PowerlineSettings;
-
+// Separator definition
 export interface SeparatorDef {
   left: string;
   right: string;
@@ -128,6 +153,7 @@ export interface SeparatorDef {
   };
 }
 
+// Git status data
 export interface GitStatus {
   branch: string | null;
   staged: number;
@@ -135,6 +161,7 @@ export interface GitStatus {
   untracked: number;
 }
 
+// Usage statistics
 export interface UsageStats {
   input: number;
   output: number;
@@ -143,31 +170,45 @@ export interface UsageStats {
   cost: number;
 }
 
+// Context passed to segment render functions
 export interface SegmentContext {
+  // From pi-mono
   model: { id: string; name?: string; reasoning?: boolean; contextWindow?: number } | undefined;
   thinkingLevel: string;
   activeProfileIndex: number | null;
   activeProfileLabel: string | null;
   sessionId: string | undefined;
+
+  // Computed
   usageStats: UsageStats;
   contextPercent: number;
   contextWindow: number;
   autoCompactEnabled: boolean;
   usingSubscription: boolean;
   sessionStartTime: number;
+
+  // Git
   git: GitStatus;
+
+  // Extension statuses
   extensionStatuses: ReadonlyMap<string, string>;
+
+  // Options
   options: StatusLineSegmentOptions;
+
+  // Theming
   theme: Theme;
   colors: ColorScheme;
 }
 
+// Rendered segment output
 export interface RenderedSegment {
   content: string;
   visible: boolean;
 }
 
+// Segment definition
 export interface StatusLineSegment<TOptions = unknown> {
-  id: StatusLineSegmentId;
+  id: string;
   render(ctx: SegmentContext, options?: TOptions): RenderedSegment;
 }

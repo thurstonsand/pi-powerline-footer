@@ -1,9 +1,9 @@
-import {
-  type BuiltinStatusLinePreset,
-  type ColorScheme,
-  type PowerlineSettings,
-  type PresetDef,
-  type ResolvedPresetDef,
+import type {
+  BuiltinStatusLinePreset,
+  ColorScheme,
+  PowerlineSettings,
+  PresetDef,
+  ResolvedPresetDef,
 } from "./types.js";
 import { getDefaultColors } from "./theme.js";
 import { resolveCustomPresetSettings } from "./custom.js";
@@ -30,6 +30,8 @@ const NERD_COLORS: ColorScheme = {
   cost: "warning",
 };
 
+export const CUSTOM_PRESET = "custom" as const;
+
 export const PRESET_NAMES = [
   "default",
   "minimal",
@@ -37,7 +39,7 @@ export const PRESET_NAMES = [
   "full",
   "nerd",
   "ascii",
-  "custom",
+  CUSTOM_PRESET,
 ] as const;
 
 const BUILTIN_PRESETS: Record<BuiltinStatusLinePreset, PresetDef> = {
@@ -119,12 +121,14 @@ function getBuiltinPreset(name: BuiltinStatusLinePreset): PresetDef {
   return BUILTIN_PRESETS[name] ?? BUILTIN_PRESETS.default;
 }
 
-export function resolvePresetDefinition(
-  settings: Pick<PowerlineSettings, "preset" | "custom">,
-): ResolvedPresetDef {
+export function getPreset(name: BuiltinStatusLinePreset): PresetDef {
+  return getBuiltinPreset(name);
+}
+
+export function resolvePresetDefinition(settings: PowerlineSettings): ResolvedPresetDef {
   const preset = settings.preset ?? "default";
 
-  if (preset !== "custom") {
+  if (preset !== CUSTOM_PRESET) {
     return {
       preset,
       definition: getBuiltinPreset(preset),
@@ -151,8 +155,4 @@ export function resolvePresetDefinition(
       segmentOptions: custom.value.options,
     },
   };
-}
-
-export function getPreset(name: BuiltinStatusLinePreset): PresetDef {
-  return getBuiltinPreset(name);
 }

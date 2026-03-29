@@ -2,6 +2,7 @@ import {
   copyToClipboard,
   getAgentDir,
   type ExtensionAPI,
+  type ExtensionContext,
   type ReadonlyFooterDataProvider,
   type Theme,
 } from "@mariozechner/pi-coding-agent";
@@ -25,21 +26,18 @@ import type {
   ResolvedPresetDef,
   SegmentContext,
   StatusLinePreset,
-  StatusLineSegment,
-  StatusLineSegmentId,
 } from "./types.js";
-import { PRESET_NAMES, resolvePresetDefinition } from "./presets.js";
+import { CUSTOM_PRESET, PRESET_NAMES, resolvePresetDefinition } from "./presets.js";
 import { isRecord } from "./json.js";
 import {
   migrateLegacyPowerlineSettingsFile,
+  normalizePreset,
   patchPowerlineSetting,
   readPowerlineSettings,
-  normalizePreset,
   readSettings,
 } from "./settings.js";
 import { getSeparator } from "./separators.js";
 import {
-  getCustomSegmentLoadErrors,
   loadSegmentsFromDirectory,
   renderSegment,
 } from "./segment-registry.js";
@@ -79,10 +77,6 @@ import {
 // ═══════════════════════════════════════════════════════════════════════════
 // Configuration
 // ═══════════════════════════════════════════════════════════════════════════
-
-export interface SegmentLoaderAPI {
-  registerSegment<TOptions = unknown>(segment: StatusLineSegment<TOptions>): StatusLineSegment<TOptions>;
-}
 
 interface PowerlineConfig {
   settings: PowerlineSettings;
@@ -389,20 +383,13 @@ function resolveShortcutConfig(settings: PowerlineSettings): PowerlineShortcuts 
   return resolved;
 }
 
-function applyPowerlineConfig(settings: PowerlineSettings): void {
-  config = {
-    settings,
-    resolvedPreset: resolvePresetDefinition(settings),
-  };
-}
-
 // ═══════════════════════════════════════════════════════════════════════════
 // Status Line Builder
 // ═══════════════════════════════════════════════════════════════════════════
 
 /** Render a single segment and return its content with width */
 function renderSegmentWithWidth(
-  segId: StatusLineSegmentId,
+  segId: string,
   ctx: SegmentContext
 ): { content: string; width: number; visible: boolean } {
   const rendered = renderSegment(segId, ctx);
@@ -544,8 +531,6 @@ export default function powerlineFooter(pi: ExtensionAPI) {
   let lastLayoutResult: { topContent: string; secondaryContent: string } | null = null;
   let lastLayoutTimestamp = 0;
   let profileSwitchInProgress = false;
-  let lastCustomPresetErrorNotified: string | null = null;
-  let lastCustomSegmentErrorsNotified: string | null = null;
 
   function overlaySelectListTheme(theme: Theme) {
     return {
@@ -557,33 +542,22 @@ export default function powerlineFooter(pi: ExtensionAPI) {
     };
   }
 
-  function reportCustomPresetError(ctx?: any): void {
-    const error = config.resolvedPreset.error;
-    if (!error) {
-      lastCustomPresetErrorNotified = null;
+  function reportCustomPresetError(ctx: ExtensionContext): void {
+    if (!config.resolvedPreset.error) {
       return;
     }
 
-    if (lastCustomPresetErrorNotified === error) {
-      return;
+    console.error(`[powerline-footer] ${config.resolvedPreset.error}`);
+    if (ctx.hasUI) {
+      ctx.ui.notify(config.resolvedPreset.error, "error");
     }
-
-    console.error(`[powerline-footer] ${error}`);
-    if (ctx?.hasUI) {
-      ctx.ui.notify(error, "error");
-    }
-    lastCustomPresetErrorNotified = error;
   }
 
-  function reportCustomSegmentErrors(ctx?: any): void {
-    const errors = getCustomSegmentLoadErrors();
+  function reportCustomSegmentErrors(
+    errors: string[],
+    ctx: ExtensionContext,
+  ): void {
     if (errors.length === 0) {
-      lastCustomSegmentErrorsNotified = null;
-      return;
-    }
-
-    const signature = errors.join("\n");
-    if (lastCustomSegmentErrorsNotified === signature) {
       return;
     }
 
@@ -591,22 +565,19 @@ export default function powerlineFooter(pi: ExtensionAPI) {
       console.error(`[powerline-footer] ${error}`);
     }
 
-    if (ctx?.hasUI) {
-      const count = errors.length;
+    if (ctx.hasUI) {
       ctx.ui.notify(
-        count === 1
+        errors.length === 1
           ? errors[0]
-          : `${count} custom segment files failed to load (see console)`,
+          : `${errors.length} custom segment files failed to load (see console)`,
         "error",
       );
     }
-
-    lastCustomSegmentErrorsNotified = signature;
   }
 
-  async function refreshCustomSegments(ctx?: any): Promise<void> {
-    await loadSegmentsFromDirectory();
-    reportCustomSegmentErrors(ctx);
+  async function refreshCustomSegments(ctx: ExtensionContext): Promise<void> {
+    const result = await loadSegmentsFromDirectory();
+    reportCustomSegmentErrors(result.errors, ctx);
   }
 
   async function showSelectOverlay(
@@ -702,7 +673,10 @@ export default function powerlineFooter(pi: ExtensionAPI) {
     const rawSettings = readSettings("powerline-footer");
     const settings = readPowerlineSettings(rawSettings);
     showLastPrompt = settings.showLastPrompt ?? true;
-    applyPowerlineConfig(settings);
+    config = {
+      settings,
+      resolvedPreset: resolvePresetDefinition(settings),
+    };
     reportCustomPresetError(ctx);
     stashedPromptHistory = readPersistedStashHistory();
     
@@ -1146,8 +1120,6 @@ export default function powerlineFooter(pi: ExtensionAPI) {
     isStreaming = false;
     stashedEditorText = null;
     stashedPromptHistory = readPersistedStashHistory();
-    reportCustomPresetError(ctx);
-    reportCustomSegmentErrors(ctx);
     if (ctx.hasUI) {
       ctx.ui.setStatus("stash", undefined);
     }
@@ -1192,14 +1164,20 @@ export default function powerlineFooter(pi: ExtensionAPI) {
 
       const preset = normalizePreset(args);
       if (preset) {
-        if (preset === "custom") {
+        if (preset === CUSTOM_PRESET) {
           await refreshCustomSegments(ctx);
         }
 
-        applyPowerlineConfig({
-          ...config.settings,
-          preset,
-        });
+        config = {
+          settings: {
+            ...config.settings,
+            preset,
+          },
+          resolvedPreset: resolvePresetDefinition({
+            ...config.settings,
+            preset,
+          }),
+        };
         reportCustomPresetError(ctx);
         lastLayoutResult = null;
         if (enabled) {
@@ -2001,11 +1979,11 @@ export default function powerlineFooter(pi: ExtensionAPI) {
   }
 }
 
-export { registerSegment } from "./segment-registry.js";
+// Public types for file-based custom segment entrypoints.
+export type { SegmentLoaderAPI } from "./segment-registry.js";
 export type {
   RenderedSegment,
   SegmentContext,
   StatusLineSegment,
-  StatusLineSegmentId,
   StatusLineSegmentOptions,
 } from "./types.js";
