@@ -5,8 +5,6 @@ import { dirname, join } from "node:path";
 import type { PowerlineSettings, PowerlineVibeSettings, StatusLinePreset } from "./types.js";
 import { isRecord } from "./json.js";
 
-export const POWERLINE_PACKAGE_NAME = "pi-powerline-footer";
-
 interface LegacyPowerlineSettings {
   powerline?: unknown;
   showLastPrompt?: unknown;
@@ -39,34 +37,6 @@ const LEGACY_POWERLINE_KEYS = [
   LEGACY_POWERLINE_PROFILE_KEY,
   ...LEGACY_POWERLINE_VIBE_KEYS,
 ] as const;
-
-function looksLikePowerlinePackageSource(source: string): boolean {
-  const normalized = source.trim().toLowerCase();
-  return normalized.length > 0 && normalized.includes(POWERLINE_PACKAGE_NAME);
-}
-
-export function isPowerlineConfiguredInSettings(
-  packages: unknown[] | undefined,
-  extensions: unknown[] | undefined,
-): boolean {
-  const packageConfigured = (packages ?? []).some((entry) => {
-    if (typeof entry === "string") {
-      return looksLikePowerlinePackageSource(entry);
-    }
-
-    if (!isRecord(entry)) {
-      return false;
-    }
-
-    return typeof entry.source === "string" && looksLikePowerlinePackageSource(entry.source);
-  });
-
-  const extensionConfigured = (extensions ?? []).some(
-    (entry) => typeof entry === "string" && entry.toLowerCase().includes(POWERLINE_PACKAGE_NAME),
-  );
-
-  return packageConfigured || extensionConfigured;
-}
 
 function getSettingsPath(): string {
   return join(getAgentDir(), "settings.json");

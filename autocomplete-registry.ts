@@ -5,18 +5,21 @@ import type {
 
 export interface InstalledPowerlineAutocompleteEnhancer {
   id: string;
+  registrationId: string;
   extensionId: string;
   enhancer: PowerlineAutocompleteEnhancer;
 }
 
 export interface AutocompleteRegistry {
+  getVersion(): number;
   getRegisteredEnhancers(): readonly PowerlineAutocompleteEnhancer[];
   getInstalledEnhancers(): readonly InstalledPowerlineAutocompleteEnhancer[];
   upsertInstalledEnhancer(
     extensionId: string,
     enhancer: PowerlineAutocompleteEnhancer,
+    registrationId: string,
   ): InstalledPowerlineAutocompleteEnhancer;
-  removeInstalledEnhancer(extensionId: string, enhancerId: string): void;
+  removeInstalledEnhancer(extensionId: string, enhancerId: string, registrationId: string): void;
   subscribe(listener: () => void): () => void;
 }
 
@@ -87,14 +90,20 @@ function installedId(extensionId: string, enhancerId: string): string {
 export function createAutocompleteRegistry(): AutocompleteRegistry {
   const installedEnhancers: InstalledPowerlineAutocompleteEnhancer[] = [];
   const listeners = new Set<() => void>();
+  let version = 0;
 
   function emitChange(): void {
+    version += 1;
     for (const listener of listeners) {
       listener();
     }
   }
 
   return {
+    getVersion() {
+      return version;
+    },
+
     getRegisteredEnhancers() {
       return installedEnhancers.map((entry) => entry.enhancer);
     },
@@ -103,16 +112,21 @@ export function createAutocompleteRegistry(): AutocompleteRegistry {
       return [...installedEnhancers];
     },
 
-    upsertInstalledEnhancer(extensionId, enhancer) {
+    upsertInstalledEnhancer(extensionId, enhancer, registrationId) {
       const normalizedExtensionId = normalizeId(extensionId);
+      const normalizedRegistrationId = normalizeId(registrationId);
       if (!normalizedExtensionId) {
         throw new Error("autocomplete enhancer extension id must be a non-empty string");
+      }
+      if (!normalizedRegistrationId) {
+        throw new Error("autocomplete enhancer registration id must be a non-empty string");
       }
 
       const normalizedEnhancer = normalizeEnhancer(enhancer);
       const id = installedId(normalizedExtensionId, normalizedEnhancer.id);
       const nextEntry: InstalledPowerlineAutocompleteEnhancer = {
         id,
+        registrationId: normalizedRegistrationId,
         extensionId: normalizedExtensionId,
         enhancer: normalizedEnhancer,
       };
@@ -128,19 +142,26 @@ export function createAutocompleteRegistry(): AutocompleteRegistry {
       return nextEntry;
     },
 
-    removeInstalledEnhancer(extensionId, enhancerId) {
+    removeInstalledEnhancer(extensionId, enhancerId, registrationId) {
       const normalizedExtensionId = normalizeId(extensionId);
       const normalizedEnhancerId = normalizeId(enhancerId);
-      if (!normalizedExtensionId || !normalizedEnhancerId) {
+      const normalizedRegistrationId = normalizeId(registrationId);
+      if (!normalizedExtensionId || !normalizedEnhancerId || !normalizedRegistrationId) {
         return;
       }
 
       const id = installedId(normalizedExtensionId, normalizedEnhancerId);
       const index = installedEnhancers.findIndex((entry) => entry.id === id);
-      if (index >= 0) {
-        installedEnhancers.splice(index, 1);
-        emitChange();
+      if (index < 0) {
+        return;
       }
+
+      if (installedEnhancers[index]?.registrationId !== normalizedRegistrationId) {
+        return;
+      }
+
+      installedEnhancers.splice(index, 1);
+      emitChange();
     },
 
     subscribe(listener) {

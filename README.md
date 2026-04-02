@@ -154,13 +154,12 @@ The package root exports:
 
 - `connectPowerlineAutocompleteExtension(...)`
 - `createPowerlineAutocompleteInteractionHandle(...)`
-- `queryPowerlineAutocompleteState(...)`
 - `requestPowerlineAutocompleteRefresh(...)`
 - `POWERLINE_AUTOCOMPLETE_EVENTS`
 - `POWERLINE_AUTOCOMPLETE_PROTOCOL_VERSION`
 - `PowerlineAutocompleteEnhancer`
 - `PowerlineAutocompleteEnhancerTrigger`
-- `PowerlineEnhancedAutocompleteProvider`
+- `PowerlineAutocompleteProvider`
 
 Example:
 
@@ -206,14 +205,27 @@ export default function myExtension(pi) {
 
 Powerline hosts the enhancer registry and re-wraps pi's base autocomplete provider, so load order is safe and native file/slash completion stays intact.
 
-Enhancers can also return an optional `getPowerlineAutocompleteHint()` method on the wrapped provider. Powerline renders that hint below the editor only while Pi's autocomplete list is visible.
+Enhancers can return a `PowerlineAutocompleteProvider`, which may optionally implement:
+
+- `getHint()`
+- `refresh(data)`
+- `deactivate(reason)`
+
+Powerline renders `getHint()` below the editor only while Pi's autocomplete list is visible.
 
 For live interaction while autocomplete is open, Powerline also exposes a small event/RPC coordination surface:
 
 - active/inactive lifecycle events for installed autocomplete contributions
 - `createPowerlineAutocompleteInteractionHandle(...)`
 - `requestPowerlineAutocompleteRefresh(...)`
-- `queryPowerlineAutocompleteState(...)`
+
+When an extension registers enhancers, `onRegistered(...)` receives registration objects containing:
+
+- `installedId` — stable logical contribution id
+- `registrationId` — current registration lease token
+- `active` — whether the contribution is currently active
+
+That lets consumers seed an interaction handle immediately from the register reply instead of doing a separate state query.
 
 **Current scope:** cross-extension autocomplete over `pi.events` is supported now. File-based local autocomplete entrypoints under `~/.pi/agent/powerline/autocomplete/` are planned later and are not part of the current release surface.
 ## Editor Stash

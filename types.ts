@@ -219,8 +219,16 @@ export interface PowerlineAutocompleteEnhancerTrigger {
   shouldActivate?(lines: string[], cursorLine: number, cursorCol: number): boolean;
 }
 
-export interface PowerlineAutocompleteEnhancer {
+export type PowerlineAutocompleteInactiveReason = "deactivated" | "autocomplete_closed";
+
+export interface PowerlineAutocompleteProvider<TRefresh = unknown> extends AutocompleteProvider {
+  getHint?(): string | undefined;
+  refresh?(data: TRefresh | undefined): boolean;
+  deactivate?(reason: PowerlineAutocompleteInactiveReason): void;
+}
+
+export interface PowerlineAutocompleteEnhancer<TRefresh = unknown> {
   id: string;
   trigger?: PowerlineAutocompleteEnhancerTrigger;
-  enhance(baseProvider: AutocompleteProvider): AutocompleteProvider;
+  enhance(baseProvider: AutocompleteProvider): PowerlineAutocompleteProvider<TRefresh>;
 }

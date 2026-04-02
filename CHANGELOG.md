@@ -3,14 +3,15 @@
 ## [Unreleased]
 
 ### Added
-- **Cross-extension autocomplete bridge** — Powerline now lets other extensions contribute autocomplete enhancers over `pi.events` without competing for editor ownership. The package root exports `connectPowerlineAutocompleteExtension(...)`, protocol constants, and enhancer types for extension authors.
-- **Load-order-safe autocomplete handshake** — External extensions and Powerline recover cleanly regardless of which loads first by combining a scoped ping/reply RPC with a `powerline:autocomplete:ready` broadcast.
-- **Live autocomplete hints** — Wrapped providers can now expose `getPowerlineAutocompleteHint()`, and Powerline renders the returned hint below the editor only while Pi autocomplete is visible.
-- **Installed autocomplete interaction API** — Powerline now emits active/inactive lifecycle events for installed autocomplete contributions, supports targeted open-autocomplete refresh requests with provider-specific payload data, and exposes a state query RPC plus interaction-handle helper for consumer extensions that need live coordination while autocomplete is visible.
-- **Bridge and runtime coverage** — Added tests for installed enhancer registry behavior, bridge registration/replay/unregister/get-state flows, and runtime provider wrapping across matching enhancers.
+- **Cross-extension autocomplete bridge** — Powerline now lets other extensions contribute autocomplete enhancers over `pi.events` without competing for editor ownership. The package root exports `connectPowerlineAutocompleteExtension(...)`, protocol constants, enhancer types, and the explicit `PowerlineAutocompleteProvider` contract for extension authors.
+- **Register-time bootstrap for autocomplete state** — Enhancer registration replies now include `installedId`, `registrationId`, and current `active` state so providers can initialize interaction state immediately without a separate state query.
+- **Bridge and runtime coverage** — Added tests for registration lease behavior, stale unregister protection, register-time active-state bootstrap, registry-version invalidation, and runtime provider wrapping across matching enhancers.
 
 ### Changed
 - **Autocomplete composition is now host-owned** — Powerline keeps the authoritative autocomplete registry and refreshes the wrapped provider when hosted enhancers change.
+- **Autocomplete protocol v2** — Registration now acts as the handshake, replacing the old ping/get-state flow. `installedId` remains stable per contribution while `registrationId` tracks the current registration lease.
+- **Explicit provider hooks** — Powerline autocomplete providers now expose optional `getHint()`, `refresh(data)`, and `deactivate(reason)` methods instead of relying on hidden wrapper method names.
+- **Honest lifecycle reasons** — Public inactive reasons are narrowed to `deactivated` and `autocomplete_closed`.
 - Created nested `powerline` config — Settings are now organized under `powerline` as an object, including `preset`, `showLastPrompt`, `shortcuts`, `profiles`, and `vibe`. Legacy top-level keys are migrated into the nested object on start.
 - `custom` preset is now settings-driven via `powerline.custom` instead of using a hard-coded layout.
 

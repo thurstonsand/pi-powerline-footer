@@ -17,6 +17,7 @@ import type {
   ColorScheme,
   PowerlineSettings,
   PresetDef,
+  PowerlineAutocompleteProvider,
   ResolvedPresetDef,
   SegmentContext,
   StatusLinePreset,
@@ -32,16 +33,13 @@ import {
 } from "./settings.js";
 import { getSeparator } from "./separators.js";
 import {
-  installPowerlineAutocompleteBridge,
   POWERLINE_AUTOCOMPLETE_EVENTS,
   type PowerlineAutocompleteRefreshRequest,
-} from "./autocomplete-bridge.js";
-import { createAutocompleteRegistry } from "./autocomplete-registry.js";
+} from "./autocomplete-protocol.js";
 import {
-  createRuntimeAutocompleteProvider,
-  type PowerlineEnhancedAutocompleteProvider,
   type PowerlineRuntimeAutocompleteProvider,
 } from "./autocomplete-runtime.js";
+import { createPowerlineAutocompleteHost, type PowerlineAutocompleteHost } from "./autocomplete-host.js";
 import { ansi, getFgAnsiCode } from "./colors.js";
 import { getGitStatus, invalidateGitStatus, invalidateGitBranch } from "./git-status.js";
 import {
@@ -581,8 +579,7 @@ function computeResponsiveLayout(
 // ═══════════════════════════════════════════════════════════════════════════
 
 export default function powerlineFooter(pi: ExtensionAPI) {
-  const autocompleteRegistry = createAutocompleteRegistry();
-  const autocompleteBridge = installPowerlineAutocompleteBridge(pi.events, autocompleteRegistry);
+  let autocompleteHost: PowerlineAutocompleteHost | null = null;
   migrateLegacyPowerlineSettingsFile("powerline-footer");
   const rawSettings = readSettings("powerline-footer");
   const resolvedShortcuts = resolveShortcutConfig(readPowerlineSettings(rawSettings));
@@ -615,9 +612,7 @@ export default function powerlineFooter(pi: ExtensionAPI) {
     POWERLINE_AUTOCOMPLETE_EVENTS.ui.refresh,
     (raw: unknown) => {
       const request = raw as PowerlineAutocompleteRefreshRequest;
-      if (
-        !autocompleteBridge.isActiveInstalledAutocomplete(request.installedId)
-      ) {
+      if (!autocompleteHost?.isActiveInstalledAutocomplete(request.installedId)) {
         return;
       }
 
@@ -798,6 +793,8 @@ export default function powerlineFooter(pi: ExtensionAPI) {
     initVibeManager(ctx);
 
     if (enabled && ctx.hasUI) {
+      autocompleteHost?.dispose();
+      autocompleteHost = createPowerlineAutocompleteHost(pi.events);
       setupCustomEditor(ctx);
       if (rawSettings.quietStartup === true) {
         setupWelcomeHeader(ctx);
@@ -1349,7 +1346,8 @@ export default function powerlineFooter(pi: ExtensionAPI) {
 
   pi.on("session_shutdown", async () => {
     disposeAutocompleteRefresh();
-    autocompleteBridge.dispose();
+    autocompleteHost?.dispose();
+    autocompleteHost = null;
   });
 
   // Command to toggle/configure
@@ -1363,6 +1361,8 @@ export default function powerlineFooter(pi: ExtensionAPI) {
         // Toggle
         enabled = !enabled;
         if (enabled) {
+          autocompleteHost?.dispose();
+          autocompleteHost = createPowerlineAutocompleteHost(pi.events);
           setupCustomEditor(ctx);
           ctx.ui.notify("Powerline enabled", "info");
         } else {
@@ -1381,6 +1381,8 @@ export default function powerlineFooter(pi: ExtensionAPI) {
           footerDataRef = null;
           tuiRef = null;
           currentEditor = null;
+          autocompleteHost?.dispose();
+          autocompleteHost = null;
           // Clear layout cache
           lastLayoutResult = null;
           ctx.ui.notify("Powerline disabled", "info");
@@ -1972,43 +1974,34 @@ export default function powerlineFooter(pi: ExtensionAPI) {
           return;
         }
 
+        let autocompleteFixed = false;
         const editorFactory = (
           tui: any,
           editorTheme: any,
           keybindings: any,
         ) => {
           class PowerlineEditor extends CustomEditor {
-            private autocompleteFixed = false;
-            private baseAutocompleteProvider: PowerlineEnhancedAutocompleteProvider | null = null;
+            private baseAutocompleteProvider: PowerlineAutocompleteProvider | null = null;
             private wrappedAutocompleteProvider: PowerlineRuntimeAutocompleteProvider | null = null;
 
             override setAutocompleteProvider(provider: AutocompleteProvider): void {
-              this.baseAutocompleteProvider =
-                provider as PowerlineEnhancedAutocompleteProvider;
+              this.baseAutocompleteProvider = provider as PowerlineAutocompleteProvider;
               this.refreshPowerlineAutocompleteProvider();
             }
 
             refreshPowerlineAutocompleteProvider(): void {
-              if (!this.baseAutocompleteProvider) {
+              if (!this.baseAutocompleteProvider || !autocompleteHost) {
                 return;
               }
 
-              this.wrappedAutocompleteProvider = createRuntimeAutocompleteProvider(
+              this.wrappedAutocompleteProvider = autocompleteHost.createRuntimeProvider(
                 this.baseAutocompleteProvider,
-                autocompleteRegistry,
-                {
-                  events: pi.events,
-                  onError: (message, error) => {
-                    console.error(`[powerline-footer] ${message}`, error);
-                    ctx.ui.notify(message, "error");
-                  },
-                },
               );
               super.setAutocompleteProvider(this.wrappedAutocompleteProvider);
             }
 
             getPowerlineAutocompleteHint(): string | undefined {
-              return this.wrappedAutocompleteProvider?.getPowerlineAutocompleteHint?.();
+              return this.wrappedAutocompleteProvider?.getHint?.();
             }
 
             getVisiblePowerlineAutocompleteHint(): string | undefined {
@@ -2050,8 +2043,8 @@ export default function powerlineFooter(pi: ExtensionAPI) {
             }
 
             override handleInput(data: string): void {
-              if (!this.autocompleteFixed && !(this as any).autocompleteProvider) {
-                this.autocompleteFixed = true;
+              if (!autocompleteFixed && !this.baseAutocompleteProvider) {
+                autocompleteFixed = true;
                 snapshotPromptHistory(this);
                 ctx.ui.setEditorComponent(editorFactory);
                 currentEditor?.handleInput(data);
@@ -2421,15 +2414,12 @@ export type {
   PowerlineAutocompleteBridgeDebugEvent,
   PowerlineAutocompleteExtensionConnection,
   PowerlineAutocompleteExtensionIdentity,
-  PowerlineAutocompleteGetStateReplyData,
-  PowerlineAutocompleteGetStateRequest,
-  PowerlineAutocompleteInactiveReason,
   PowerlineAutocompleteInactiveStateData,
-  PowerlineAutocompletePingReplyData,
-  PowerlineAutocompletePingRequest,
+  PowerlineAutocompleteReadyData,
   PowerlineAutocompleteRefreshRequest,
   PowerlineAutocompleteRegisterReplyData,
   PowerlineAutocompleteRegisterRequest,
+  PowerlineAutocompleteRegistration,
   PowerlineAutocompleteRpcReply,
   PowerlineAutocompleteUnregisterRequest,
 } from "./autocomplete-bridge.js";
@@ -2437,25 +2427,20 @@ export {
   connectPowerlineAutocompleteExtension,
   POWERLINE_AUTOCOMPLETE_EVENTS,
   POWERLINE_AUTOCOMPLETE_PROTOCOL_VERSION,
-  queryPowerlineAutocompleteState,
 } from "./autocomplete-bridge.js";
 export type {
-  PowerlineAutocompleteHintProvider,
   PowerlineAutocompleteInteractionHandle,
-  PowerlineEnhancedAutocompleteProvider,
   PowerlineRuntimeAutocompleteProvider,
 } from "./autocomplete-runtime.js";
 export {
   createPowerlineAutocompleteInteractionHandle,
   requestPowerlineAutocompleteRefresh,
 } from "./autocomplete-runtime.js";
-export {
-  isPowerlineConfiguredInSettings,
-  POWERLINE_PACKAGE_NAME,
-} from "./settings.js";
 export type {
   PowerlineAutocompleteEnhancer,
   PowerlineAutocompleteEnhancerTrigger,
+  PowerlineAutocompleteInactiveReason,
+  PowerlineAutocompleteProvider,
   RenderedSegment,
   SegmentContext,
   StatusLineSegment,

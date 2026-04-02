@@ -23,7 +23,7 @@ describe("autocomplete enhancer registry", () => {
 
     expect(root.connectPowerlineAutocompleteExtension).toBeTypeOf("function");
     expect(root.POWERLINE_AUTOCOMPLETE_EVENTS).toBeDefined();
-    expect(root.POWERLINE_AUTOCOMPLETE_PROTOCOL_VERSION).toBe(1);
+    expect(root.POWERLINE_AUTOCOMPLETE_PROTOCOL_VERSION).toBe(2);
   });
 
   test("re-registering the same extension and id replaces the enhancer in place", async () => {
@@ -34,19 +34,19 @@ describe("autocomplete enhancer registry", () => {
       enhance() {
         return createProvider("old");
       },
-    });
+    }, "r1");
     registry.upsertInstalledEnhancer("pi-files", {
       id: "files",
       enhance() {
         return createProvider("files");
       },
-    });
+    }, "r2");
     registry.upsertInstalledEnhancer("pi-sessions", {
       id: "sessions",
       enhance() {
         return createProvider("new");
       },
-    });
+    }, "r3");
 
     const enhancers = registry.getRegisteredEnhancers();
 
@@ -67,13 +67,13 @@ describe("autocomplete enhancer registry", () => {
       enhance() {
         return createProvider("alpha");
       },
-    });
+    }, "r1");
     registry.upsertInstalledEnhancer("beta", {
       id: "sessions",
       enhance() {
         return createProvider("beta");
       },
-    });
+    }, "r2");
 
     expect(registry.getRegisteredEnhancers().map((enhancer) => enhancer.id)).toEqual(["sessions", "sessions"]);
   });
@@ -90,7 +90,7 @@ describe("autocomplete enhancer registry", () => {
           .then((result) => trace.push(`enhance:${result?.prefix ?? "none"}->alpha`));
         return createProvider("alpha");
       },
-    });
+    }, "r1");
     registry.upsertInstalledEnhancer("beta", {
       id: "beta",
       enhance(baseProvider) {
@@ -99,7 +99,7 @@ describe("autocomplete enhancer registry", () => {
           .then((result) => trace.push(`enhance:${result?.prefix ?? "none"}->beta`));
         return createProvider("beta");
       },
-    });
+    }, "r2");
     registry.upsertInstalledEnhancer("gamma", {
       id: "gamma",
       enhance(baseProvider) {
@@ -108,7 +108,7 @@ describe("autocomplete enhancer registry", () => {
           .then((result) => trace.push(`enhance:${result?.prefix ?? "none"}->gamma`));
         return createProvider("gamma");
       },
-    });
+    }, "r3");
 
     const finalProvider = registry.getRegisteredEnhancers().reduce(
       (provider, enhancer) => enhancer.enhance(provider),
@@ -127,7 +127,7 @@ describe("autocomplete enhancer registry", () => {
     ).toBe("gamma");
   });
 
-  test("removeInstalledEnhancer removes contributions cleanly", () => {
+  test("removeInstalledEnhancer requires the matching registration id", () => {
     const registry = createAutocompleteRegistry();
 
     registry.upsertInstalledEnhancer("pi-sessions", {
@@ -135,16 +135,19 @@ describe("autocomplete enhancer registry", () => {
       enhance(baseProvider) {
         return baseProvider;
       },
-    });
+    }, "r1");
     registry.upsertInstalledEnhancer("pi-files", {
       id: "files",
       enhance(baseProvider) {
         return baseProvider;
       },
-    });
+    }, "r2");
 
-    registry.removeInstalledEnhancer("pi-sessions", "sessions");
-    registry.removeInstalledEnhancer("pi-sessions", "missing");
+    registry.removeInstalledEnhancer("pi-sessions", "sessions", "stale");
+    expect(registry.getRegisteredEnhancers().map((enhancer) => enhancer.id)).toEqual(["sessions", "files"]);
+
+    registry.removeInstalledEnhancer("pi-sessions", "sessions", "r1");
+    registry.removeInstalledEnhancer("pi-sessions", "missing", "r1");
 
     expect(registry.getRegisteredEnhancers().map((enhancer) => enhancer.id)).toEqual(["files"]);
   });
@@ -159,23 +162,24 @@ describe("autocomplete enhancer registry", () => {
       enhance(baseProvider) {
         return baseProvider;
       },
-    });
+    }, "r1");
     registry.upsertInstalledEnhancer("pi-sessions", {
       id: "sessions",
       enhance(baseProvider) {
         return baseProvider;
       },
-    });
-    registry.removeInstalledEnhancer("pi-sessions", "sessions");
+    }, "r2");
+    registry.removeInstalledEnhancer("pi-sessions", "sessions", "r2");
     unsubscribe();
     registry.upsertInstalledEnhancer("pi-sessions", {
       id: "sessions",
       enhance(baseProvider) {
         return baseProvider;
       },
-    });
+    }, "r3");
 
     expect(listener).toHaveBeenCalledTimes(3);
+    expect(registry.getVersion()).toBe(4);
   });
 
   test("prefix triggers activate only when the cursor token matches", () => {
@@ -188,7 +192,7 @@ describe("autocomplete enhancer registry", () => {
       enhance(baseProvider) {
         return baseProvider;
       },
-    });
+    }, "r1");
 
     expect(shouldActivateAutocompleteEnhancer(
       entry.enhancer,
@@ -219,7 +223,7 @@ describe("autocomplete enhancer registry", () => {
       enhance(baseProvider) {
         return baseProvider;
       },
-    });
+    }, "r1");
 
     expect(shouldActivateAutocompleteEnhancer(entry.enhancer, ["open #session"], 0, "open #session".length)).toBe(true);
     expect(shouldActivateAutocompleteEnhancer(entry.enhancer, ["open @session"], 0, "open @session".length)).toBe(false);

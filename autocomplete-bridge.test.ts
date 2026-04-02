@@ -7,7 +7,7 @@ import {
   installPowerlineAutocompleteBridge,
   POWERLINE_AUTOCOMPLETE_EVENTS,
   POWERLINE_AUTOCOMPLETE_PROTOCOL_VERSION,
-  queryPowerlineAutocompleteState,
+  type PowerlineAutocompleteRegistration,
 } from "./autocomplete-bridge.js";
 import { createAutocompleteRegistry } from "./autocomplete-registry.js";
 
@@ -30,6 +30,7 @@ describe("autocomplete bridge", () => {
   test("registers across extensions when Powerline host loads first", async () => {
     const events: EventBus = createEventBus();
     const registry = createAutocompleteRegistry();
+    const registrations: PowerlineAutocompleteRegistration[][] = [];
 
     const bridge = installPowerlineAutocompleteBridge(events, registry);
     const disposeExtension = connectPowerlineAutocompleteExtension(events, {
@@ -44,10 +45,20 @@ describe("autocomplete bridge", () => {
         },
       ],
       pingTimeoutMs: 20,
+      onRegistered(nextRegistrations) {
+        registrations.push(nextRegistrations);
+      },
     });
 
     await flush(5);
 
+    expect(registrations).toHaveLength(1);
+    expect(registrations[0]?.[0]).toMatchObject({
+      enhancerId: "sessions",
+      installedId: "pi-sessions::sessions",
+      active: false,
+    });
+    expect(typeof registrations[0]?.[0]?.registrationId).toBe("string");
     expect(registry.getRegisteredEnhancers().map((enhancer) => enhancer.id)).toEqual(["sessions"]);
     expect(
       (
@@ -94,13 +105,13 @@ describe("autocomplete bridge", () => {
 
     expect(registry.getRegisteredEnhancers().map((enhancer) => enhancer.id)).toEqual(["sessions"]);
     expect(debugEvents).toContain("ready:receive");
-    expect(debugEvents).not.toContain("rpc:ping:timeout");
+    expect(debugEvents).not.toContain("rpc:register:timeout");
 
     disposeExtension();
     bridge.dispose();
   });
 
-  test("same extension and enhancer id replace in place over the bridge", async () => {
+  test("same extension and enhancer id replace in place over the bridge and stale unregister is ignored", async () => {
     const events: EventBus = createEventBus();
     const registry = createAutocompleteRegistry();
 
@@ -144,13 +155,17 @@ describe("autocomplete bridge", () => {
     ).toBe("new");
 
     firstConnection();
+    await flush(5);
+    expect(registry.getRegisteredEnhancers()).toHaveLength(1);
+
     secondConnection();
     bridge.dispose();
   });
 
-  test("reports active installed autocomplete state over rpc", async () => {
+  test("register reply includes current active state", async () => {
     const events: EventBus = createEventBus();
     const registry = createAutocompleteRegistry();
+    const registrations: PowerlineAutocompleteRegistration[][] = [];
 
     const bridge = installPowerlineAutocompleteBridge(events, registry);
     events.emit(POWERLINE_AUTOCOMPLETE_EVENTS.state.active, {
@@ -159,20 +174,36 @@ describe("autocomplete bridge", () => {
       enhancerId: "sessions",
     });
 
-    await expect(
-      queryPowerlineAutocompleteState(events, "pi-sessions::sessions", 20),
-    ).resolves.toBe(true);
-    await expect(queryPowerlineAutocompleteState(events, "pi-sessions::missing", 20)).resolves.toBe(
-      false,
-    );
-    expect(bridge.isActiveInstalledAutocomplete("pi-sessions::sessions")).toBe(true);
-    expect(bridge.isActiveInstalledAutocomplete("pi-sessions::missing")).toBe(false);
+    const disposeExtension = connectPowerlineAutocompleteExtension(events, {
+      extension: { id: "pi-sessions" },
+      enhancers: [
+        {
+          id: "sessions",
+          enhance() {
+            return createProvider("sessions");
+          },
+        },
+      ],
+      pingTimeoutMs: 20,
+      onRegistered(nextRegistrations) {
+        registrations.push(nextRegistrations);
+      },
+    });
 
+    await flush(5);
+
+    expect(registrations[0]?.[0]).toMatchObject({
+      installedId: "pi-sessions::sessions",
+      active: true,
+    });
+    expect(bridge.isActiveInstalledAutocomplete("pi-sessions::sessions")).toBe(true);
+
+    disposeExtension();
     bridge.dispose();
   });
 
   test("exports the current protocol version", () => {
-    expect(POWERLINE_AUTOCOMPLETE_PROTOCOL_VERSION).toBe(1);
+    expect(POWERLINE_AUTOCOMPLETE_PROTOCOL_VERSION).toBe(2);
   });
 });
 

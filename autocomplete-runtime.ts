@@ -1,32 +1,19 @@
+import type { AutocompleteSuggestions } from "@mariozechner/pi-tui";
 import type { EventBus } from "@mariozechner/pi-coding-agent";
-import type {
-  AutocompleteProvider,
-  AutocompleteSuggestions,
-} from "@mariozechner/pi-tui";
 
+import {
+  POWERLINE_AUTOCOMPLETE_EVENTS,
+  type PowerlineAutocompleteRefreshRequest,
+} from "./autocomplete-protocol.js";
 import type {
   AutocompleteRegistry,
   InstalledPowerlineAutocompleteEnhancer,
 } from "./autocomplete-registry.js";
 import { shouldActivateAutocompleteEnhancer } from "./autocomplete-registry.js";
-import {
-  POWERLINE_AUTOCOMPLETE_EVENTS,
-  type PowerlineAutocompleteActiveStateData,
-  type PowerlineAutocompleteInactiveReason,
-  type PowerlineAutocompleteInactiveStateData,
-  type PowerlineAutocompleteRefreshRequest,
-} from "./autocomplete-bridge.js";
-
-export interface PowerlineAutocompleteHintProvider {
-  getPowerlineAutocompleteHint?(): string | undefined;
-}
-
-export interface PowerlineEnhancedAutocompleteProvider
-  extends AutocompleteProvider,
-    PowerlineAutocompleteHintProvider {
-  setPowerlineAutocompleteData?(data: unknown): void;
-  clearPowerlineAutocompleteState?(): void;
-}
+import type {
+  PowerlineAutocompleteInactiveReason,
+  PowerlineAutocompleteProvider,
+} from "./types.js";
 
 export interface PowerlineAutocompleteInteractionHandle<TData = unknown> {
   id: string;
@@ -37,57 +24,16 @@ export interface PowerlineAutocompleteInteractionHandle<TData = unknown> {
 }
 
 export interface RuntimeAutocompleteProviderOptions {
-  events?: EventBus;
-  onError?(message: string, error?: unknown): void;
+  onStateChange?(
+    previousEntries: readonly InstalledPowerlineAutocompleteEnhancer[],
+    nextEntries: readonly InstalledPowerlineAutocompleteEnhancer[],
+    inactiveReason: PowerlineAutocompleteInactiveReason,
+  ): void;
 }
 
-export interface PowerlineRuntimeAutocompleteProvider extends PowerlineEnhancedAutocompleteProvider {
+export interface PowerlineRuntimeAutocompleteProvider extends PowerlineAutocompleteProvider {
   applyPowerlineAutocompleteRefreshRequest?(request: PowerlineAutocompleteRefreshRequest): boolean;
-}
-
-function bindMethod<TMethod extends (...args: any[]) => any>(
-  provider: unknown,
-  methodName: string,
-): TMethod | undefined {
-  const method = (provider as Record<string, unknown> | null | undefined)?.[methodName];
-  if (typeof method !== "function") {
-    return undefined;
-  }
-
-  return method.bind(provider) as TMethod;
-}
-
-function bindMethodWithFallback<TMethod extends (...args: any[]) => any>(
-  provider: unknown,
-  fallback: unknown,
-  methodName: string,
-): TMethod | undefined {
-  return bindMethod<TMethod>(provider, methodName) ?? bindMethod<TMethod>(fallback, methodName);
-}
-
-function toRuntimeAutocompleteProvider(
-  provider: PowerlineEnhancedAutocompleteProvider,
-  previousProvider?: PowerlineEnhancedAutocompleteProvider,
-): PowerlineEnhancedAutocompleteProvider {
-  const getSuggestions = provider.getSuggestions.bind(provider);
-  const applyCompletion = provider.applyCompletion.bind(provider);
-  const getPowerlineAutocompleteHint = bindMethodWithFallback<
-    NonNullable<PowerlineAutocompleteHintProvider["getPowerlineAutocompleteHint"]>
-  >(provider, previousProvider, "getPowerlineAutocompleteHint");
-  const setPowerlineAutocompleteData = bindMethodWithFallback<
-    NonNullable<PowerlineEnhancedAutocompleteProvider["setPowerlineAutocompleteData"]>
-  >(provider, previousProvider, "setPowerlineAutocompleteData");
-  const clearPowerlineAutocompleteState = bindMethodWithFallback<
-    NonNullable<PowerlineEnhancedAutocompleteProvider["clearPowerlineAutocompleteState"]>
-  >(provider, previousProvider, "clearPowerlineAutocompleteState");
-
-  return {
-    getSuggestions,
-    applyCompletion,
-    ...(getPowerlineAutocompleteHint ? { getPowerlineAutocompleteHint } : {}),
-    ...(setPowerlineAutocompleteData ? { setPowerlineAutocompleteData } : {}),
-    ...(clearPowerlineAutocompleteState ? { clearPowerlineAutocompleteState } : {}),
-  };
+  clearPowerlineAutocompleteState?(): void;
 }
 
 function sameEnhancerSet(
@@ -101,68 +47,30 @@ function sameEnhancerSet(
   return left.every((entry, index) => entry.id === right[index]?.id);
 }
 
-function emitActiveState(
-  events: EventBus | undefined,
-  entry: InstalledPowerlineAutocompleteEnhancer,
-): void {
-  if (!events) {
-    return;
-  }
-
-  const payload: PowerlineAutocompleteActiveStateData = {
-    installedId: entry.id,
-    extensionId: entry.extensionId,
-    enhancerId: entry.enhancer.id,
-  };
-  events.emit(POWERLINE_AUTOCOMPLETE_EVENTS.state.active, payload);
-}
-
-function emitInactiveState(
-  events: EventBus | undefined,
-  entry: InstalledPowerlineAutocompleteEnhancer,
-  reason: PowerlineAutocompleteInactiveReason,
-): void {
-  if (!events) {
-    return;
-  }
-
-  const payload: PowerlineAutocompleteInactiveStateData = {
-    installedId: entry.id,
-    extensionId: entry.extensionId,
-    enhancerId: entry.enhancer.id,
-    reason,
-  };
-  events.emit(POWERLINE_AUTOCOMPLETE_EVENTS.state.inactive, payload);
-}
-
-function syncInstalledEnhancerState(
-  events: EventBus | undefined,
-  previousEntries: readonly InstalledPowerlineAutocompleteEnhancer[],
-  nextEntries: readonly InstalledPowerlineAutocompleteEnhancer[],
-): void {
-  const previousById = new Map(previousEntries.map((entry) => [entry.id, entry]));
-  const nextById = new Map(nextEntries.map((entry) => [entry.id, entry]));
-
-  for (const [id, entry] of previousById) {
-    if (!nextById.has(id)) {
-      emitInactiveState(events, entry, "enhancer_changed");
+function getTopmostHint(
+  baseProvider: PowerlineAutocompleteProvider,
+  activeEnhancers: readonly InstalledPowerlineAutocompleteEnhancer[],
+  activeProviders: ReadonlyMap<string, PowerlineAutocompleteProvider>,
+): string | undefined {
+  for (let index = activeEnhancers.length - 1; index >= 0; index -= 1) {
+    const provider = activeProviders.get(activeEnhancers[index]!.id);
+    const hint = provider?.getHint?.();
+    if (hint) {
+      return hint;
     }
   }
 
-  for (const [id, entry] of nextById) {
-    if (!previousById.has(id)) {
-      emitActiveState(events, entry);
-    }
-  }
+  return baseProvider.getHint?.();
 }
 
-function clearInstalledEnhancerState(
-  events: EventBus | undefined,
-  activeEntries: readonly InstalledPowerlineAutocompleteEnhancer[],
+function deactivateProviders(
+  activeEnhancers: readonly InstalledPowerlineAutocompleteEnhancer[],
+  activeProviders: ReadonlyMap<string, PowerlineAutocompleteProvider>,
   reason: PowerlineAutocompleteInactiveReason,
 ): void {
-  for (const entry of activeEntries) {
-    emitInactiveState(events, entry, reason);
+  for (let index = activeEnhancers.length - 1; index >= 0; index -= 1) {
+    const provider = activeProviders.get(activeEnhancers[index]!.id);
+    provider?.deactivate?.(reason);
   }
 }
 
@@ -178,8 +86,9 @@ export function requestPowerlineAutocompleteRefresh<TData>(
 export function createPowerlineAutocompleteInteractionHandle<TData>(
   events: EventBus,
   id: string,
+  options: { initialActive?: boolean } = {},
 ): PowerlineAutocompleteInteractionHandle<TData> {
-  let isActive = false;
+  let isActive = options.initialActive === true;
   const listeners = new Set<(isActive: boolean) => void>();
 
   function notify(): void {
@@ -189,7 +98,7 @@ export function createPowerlineAutocompleteInteractionHandle<TData>(
   }
 
   const unsubscribeActive = events.on(POWERLINE_AUTOCOMPLETE_EVENTS.state.active, (raw: unknown) => {
-    const event = raw as PowerlineAutocompleteActiveStateData;
+    const event = raw as { installedId: string };
     if (event.installedId !== id) {
       return;
     }
@@ -199,7 +108,7 @@ export function createPowerlineAutocompleteInteractionHandle<TData>(
   });
 
   const unsubscribeInactive = events.on(POWERLINE_AUTOCOMPLETE_EVENTS.state.inactive, (raw: unknown) => {
-    const event = raw as PowerlineAutocompleteInactiveStateData;
+    const event = raw as { installedId: string };
     if (event.installedId !== id) {
       return;
     }
@@ -231,42 +140,45 @@ export function createPowerlineAutocompleteInteractionHandle<TData>(
 }
 
 export function createRuntimeAutocompleteProvider(
-  baseProvider: PowerlineEnhancedAutocompleteProvider,
+  baseProvider: PowerlineAutocompleteProvider,
   registry: AutocompleteRegistry,
   options: RuntimeAutocompleteProviderOptions = {},
 ): PowerlineRuntimeAutocompleteProvider {
   let activeEnhancers: readonly InstalledPowerlineAutocompleteEnhancer[] = [];
-  let activeProviders = new Map<string, PowerlineEnhancedAutocompleteProvider>();
-  let activeProvider = toRuntimeAutocompleteProvider(baseProvider);
+  let activeProviders = new Map<string, PowerlineAutocompleteProvider>();
+  let activeProvider: PowerlineAutocompleteProvider = baseProvider;
+  let activeRegistryVersion = registry.getVersion();
 
   function resolveActiveProvider(
     lines: string[],
     cursorLine: number,
     cursorCol: number,
-  ): PowerlineEnhancedAutocompleteProvider {
+  ): PowerlineAutocompleteProvider {
+    const registryVersion = registry.getVersion();
     const matchingEnhancers = registry.getInstalledEnhancers().filter((entry) =>
       shouldActivateAutocompleteEnhancer(entry.enhancer, lines, cursorLine, cursorCol),
     );
 
-    if (sameEnhancerSet(activeEnhancers, matchingEnhancers)) {
+    if (registryVersion === activeRegistryVersion && sameEnhancerSet(activeEnhancers, matchingEnhancers)) {
       return activeProvider;
     }
 
-    let nextProvider = toRuntimeAutocompleteProvider(baseProvider);
+    let nextProvider: PowerlineAutocompleteProvider = baseProvider;
     const resolvedEnhancers: InstalledPowerlineAutocompleteEnhancer[] = [];
-    const resolvedProviders = new Map<string, PowerlineEnhancedAutocompleteProvider>();
+    const resolvedProviders = new Map<string, PowerlineAutocompleteProvider>();
 
     for (const entry of matchingEnhancers) {
-      const enhancedProvider = entry.enhancer.enhance(nextProvider) as PowerlineEnhancedAutocompleteProvider;
+      const enhancedProvider = entry.enhancer.enhance(nextProvider);
       resolvedEnhancers.push(entry);
       resolvedProviders.set(entry.id, enhancedProvider);
-      nextProvider = toRuntimeAutocompleteProvider(enhancedProvider, nextProvider);
+      nextProvider = enhancedProvider;
     }
 
-    syncInstalledEnhancerState(options.events, activeEnhancers, resolvedEnhancers);
+    options.onStateChange?.(activeEnhancers, resolvedEnhancers, "deactivated");
     activeEnhancers = resolvedEnhancers;
     activeProviders = resolvedProviders;
     activeProvider = nextProvider;
+    activeRegistryVersion = registryVersion;
     return activeProvider;
   }
 
@@ -285,17 +197,24 @@ export function createRuntimeAutocompleteProvider(
       );
     },
     applyCompletion(lines, cursorLine, cursorCol, item, prefix) {
-      return resolveActiveProvider(lines, cursorLine, cursorCol).applyCompletion(lines, cursorLine, cursorCol, item, prefix);
+      return resolveActiveProvider(lines, cursorLine, cursorCol).applyCompletion(
+        lines,
+        cursorLine,
+        cursorCol,
+        item,
+        prefix,
+      );
     },
-    getPowerlineAutocompleteHint() {
-      return activeProvider.getPowerlineAutocompleteHint?.();
+    getHint() {
+      return getTopmostHint(baseProvider, activeEnhancers, activeProviders);
     },
     clearPowerlineAutocompleteState() {
-      activeProvider.clearPowerlineAutocompleteState?.();
-      clearInstalledEnhancerState(options.events, activeEnhancers, "autocomplete_closed");
+      deactivateProviders(activeEnhancers, activeProviders, "autocomplete_closed");
+      options.onStateChange?.(activeEnhancers, [], "autocomplete_closed");
       activeEnhancers = [];
       activeProviders = new Map();
-      activeProvider = toRuntimeAutocompleteProvider(baseProvider);
+      activeProvider = baseProvider;
+      activeRegistryVersion = registry.getVersion();
     },
     applyPowerlineAutocompleteRefreshRequest(request: PowerlineAutocompleteRefreshRequest) {
       const provider = activeProviders.get(request.installedId);
@@ -303,8 +222,7 @@ export function createRuntimeAutocompleteProvider(
         return false;
       }
 
-      provider.setPowerlineAutocompleteData?.(request.data);
-      return true;
+      return provider.refresh?.(request.data) ?? false;
     },
   };
 }

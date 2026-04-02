@@ -2,126 +2,51 @@ import { randomUUID } from "node:crypto";
 
 import type { EventBus } from "@mariozechner/pi-coding-agent";
 
+import {
+  createReplyChannel,
+  POWERLINE_AUTOCOMPLETE_EVENTS,
+  POWERLINE_AUTOCOMPLETE_PROTOCOL_VERSION,
+  replyToRpc,
+  validateProtocolVersion,
+  type PowerlineAutocompleteActiveStateData,
+  type PowerlineAutocompleteBridgeDebugEvent,
+  type PowerlineAutocompleteExtensionIdentity,
+  type PowerlineAutocompleteInactiveStateData,
+  type PowerlineAutocompleteReadyData,
+  type PowerlineAutocompleteRegisterReplyData,
+  type PowerlineAutocompleteRegisterRequest,
+  type PowerlineAutocompleteRegistration,
+  type PowerlineAutocompleteRpcReply,
+  type PowerlineAutocompleteUnregisterRequest,
+} from "./autocomplete-protocol.js";
 import type { AutocompleteRegistry } from "./autocomplete-registry.js";
 import type { PowerlineAutocompleteEnhancer } from "./types.js";
 
-export const POWERLINE_AUTOCOMPLETE_PROTOCOL_VERSION = 1 as const;
+export type {
+  PowerlineAutocompleteActiveStateData,
+  PowerlineAutocompleteBridgeDebugEvent,
+  PowerlineAutocompleteExtensionIdentity,
+  PowerlineAutocompleteInactiveStateData,
+  PowerlineAutocompleteReadyData,
+  PowerlineAutocompleteRefreshRequest,
+  PowerlineAutocompleteRegisterReplyData,
+  PowerlineAutocompleteRegisterRequest,
+  PowerlineAutocompleteRegistration,
+  PowerlineAutocompleteRpcReply,
+  PowerlineAutocompleteUnregisterRequest,
+} from "./autocomplete-protocol.js";
 
-export const POWERLINE_AUTOCOMPLETE_EVENTS = {
-  ready: "powerline:autocomplete:ready",
-  state: {
-    active: "powerline:autocomplete:state:active",
-    inactive: "powerline:autocomplete:state:inactive",
-  },
-  ui: {
-    refresh: "powerline:autocomplete:ui:refresh",
-  },
-  rpc: {
-    ping: "powerline:autocomplete:rpc:ping",
-    register: "powerline:autocomplete:rpc:register",
-    unregister: "powerline:autocomplete:rpc:unregister",
-    getState: "powerline:autocomplete:rpc:get-state",
-  },
-} as const;
-
-export interface PowerlineAutocompleteExtensionIdentity {
-  id: string;
-  version?: string;
-}
-
-export interface PowerlineAutocompletePingRequest {
-  requestId: string;
-}
-
-export interface PowerlineAutocompleteRegisterRequest {
-  requestId: string;
-  protocolVersion: number;
-  extension: PowerlineAutocompleteExtensionIdentity;
-  enhancer: PowerlineAutocompleteEnhancer;
-}
-
-export interface PowerlineAutocompleteUnregisterRequest {
-  requestId: string;
-  protocolVersion: number;
-  extension: PowerlineAutocompleteExtensionIdentity;
-  enhancerId: string;
-}
-
-export interface PowerlineAutocompleteGetStateRequest {
-  requestId: string;
-  installedId: string;
-}
-
-export interface PowerlineAutocompletePingReplyData {
-  version: 1;
-}
-
-export interface PowerlineAutocompleteRegisterReplyData {
-  installedId: string;
-}
-
-export interface PowerlineAutocompleteGetStateReplyData {
-  isActive: boolean;
-}
-
-export interface PowerlineAutocompleteActiveStateData {
-  installedId: string;
-  extensionId: string;
-  enhancerId: string;
-}
-
-export type PowerlineAutocompleteInactiveReason =
-  | "autocomplete_closed"
-  | "cursor_moved"
-  | "enhancer_changed"
-  | "editor_replaced"
-  | "shutdown";
-
-export interface PowerlineAutocompleteInactiveStateData
-  extends PowerlineAutocompleteActiveStateData {
-  reason: PowerlineAutocompleteInactiveReason;
-}
-
-export interface PowerlineAutocompleteRefreshRequest<TData = unknown> {
-  installedId: string;
-  data?: TData;
-}
-
-export type PowerlineAutocompleteRpcReply<TData = void> =
-  | { success: true; data?: TData }
-  | { success: false; error: string };
-
-export interface PowerlineAutocompleteBridgeDebugEvent {
-  type:
-    | "ready:emit"
-    | "ready:receive"
-    | "rpc:ping:emit"
-    | "rpc:ping:reply"
-    | "rpc:ping:timeout"
-    | "rpc:ping:handle"
-    | "rpc:register:emit"
-    | "rpc:register:reply"
-    | "rpc:register:timeout"
-    | "rpc:register:handle"
-    | "rpc:unregister:emit"
-    | "rpc:unregister:reply"
-    | "rpc:unregister:timeout"
-    | "rpc:unregister:handle"
-    | "rpc:get-state:emit"
-    | "rpc:get-state:reply"
-    | "rpc:get-state:timeout"
-    | "rpc:get-state:handle";
-  channel?: string;
-  requestId?: string;
-  data?: unknown;
-}
+export {
+  POWERLINE_AUTOCOMPLETE_EVENTS,
+  POWERLINE_AUTOCOMPLETE_PROTOCOL_VERSION,
+} from "./autocomplete-protocol.js";
 
 export interface PowerlineAutocompleteExtensionConnection {
   extension: PowerlineAutocompleteExtensionIdentity;
   enhancers: PowerlineAutocompleteEnhancer[];
   pingTimeoutMs?: number;
   debug?(event: PowerlineAutocompleteBridgeDebugEvent): void;
-  onRegistered?(installedIds: string[]): void;
+  onRegistered?(registrations: PowerlineAutocompleteRegistration[]): void;
   onSyncError?(error: unknown): void;
 }
 
@@ -132,17 +57,7 @@ interface CancellablePromise<TValue> {
 }
 
 type DebugLogger = ((event: PowerlineAutocompleteBridgeDebugEvent) => void) | undefined;
-type RpcDebugBase = "rpc:ping" | "rpc:register" | "rpc:unregister" | "rpc:get-state";
-
-function createReplyChannel(channel: string, requestId: string): string {
-  return `${channel}:reply:${requestId}`;
-}
-
-function validateProtocolVersion(protocolVersion: number): void {
-  if (protocolVersion !== POWERLINE_AUTOCOMPLETE_PROTOCOL_VERSION) {
-    throw new Error(`Unsupported autocomplete protocol version ${protocolVersion}.`);
-  }
-}
+type RpcDebugBase = "rpc:register" | "rpc:unregister";
 
 function createRpcDebugType(
   base: RpcDebugBase,
@@ -251,50 +166,10 @@ function emitRpcCall<TReplyData>(
   return wait;
 }
 
-function installPingRpcHandler(events: EventBus, debug: DebugLogger): () => void {
-  return events.on(POWERLINE_AUTOCOMPLETE_EVENTS.rpc.ping, (raw: unknown) => {
-    const request = raw as PowerlineAutocompletePingRequest;
-    debug?.({
-      type: "rpc:ping:handle",
-      channel: POWERLINE_AUTOCOMPLETE_EVENTS.rpc.ping,
-      requestId: request.requestId,
-      data: raw,
-    });
-
-    const reply: PowerlineAutocompleteRpcReply<PowerlineAutocompletePingReplyData> = {
-      success: true,
-      data: { version: POWERLINE_AUTOCOMPLETE_PROTOCOL_VERSION },
-    };
-    events.emit(
-      createReplyChannel(POWERLINE_AUTOCOMPLETE_EVENTS.rpc.ping, request.requestId),
-      reply,
-    );
-  });
-}
-
-function replyToRpc<TData = void>(
-  events: EventBus,
-  channel: string,
-  requestId: string,
-  handler: () => TData,
-): void {
-  const replyChannel = createReplyChannel(channel, requestId);
-  try {
-    const data = handler();
-    const reply: PowerlineAutocompleteRpcReply<TData> = { success: true, data };
-    events.emit(replyChannel, reply);
-  } catch (error) {
-    const reply: PowerlineAutocompleteRpcReply = {
-      success: false,
-      error: error instanceof Error ? error.message : String(error),
-    };
-    events.emit(replyChannel, reply);
-  }
-}
-
 function installRegisterRpcHandler(
   events: EventBus,
   registry: AutocompleteRegistry,
+  isActiveInstalledAutocomplete: (installedId: string) => boolean,
   debug: DebugLogger,
 ): () => void {
   return events.on(POWERLINE_AUTOCOMPLETE_EVENTS.rpc.register, (raw: unknown) => {
@@ -312,8 +187,17 @@ function installRegisterRpcHandler(
       request.requestId,
       () => {
         validateProtocolVersion(request.protocolVersion);
-        const entry = registry.upsertInstalledEnhancer(request.extension.id, request.enhancer);
-        return { installedId: entry.id };
+        const registrationId = randomUUID();
+        const entry = registry.upsertInstalledEnhancer(
+          request.extension.id,
+          request.enhancer,
+          registrationId,
+        );
+        return {
+          installedId: entry.id,
+          registrationId: entry.registrationId,
+          active: isActiveInstalledAutocomplete(entry.id),
+        };
       },
     );
   });
@@ -335,31 +219,12 @@ function installUnregisterRpcHandler(
 
     replyToRpc(events, POWERLINE_AUTOCOMPLETE_EVENTS.rpc.unregister, request.requestId, () => {
       validateProtocolVersion(request.protocolVersion);
-      registry.removeInstalledEnhancer(request.extension.id, request.enhancerId);
+      registry.removeInstalledEnhancer(
+        request.extension.id,
+        request.enhancerId,
+        request.registrationId,
+      );
     });
-  });
-}
-
-function installGetStateRpcHandler(
-  events: EventBus,
-  isActiveInstalledAutocomplete: (installedId: string) => boolean,
-  debug: DebugLogger,
-): () => void {
-  return events.on(POWERLINE_AUTOCOMPLETE_EVENTS.rpc.getState, (raw: unknown) => {
-    const request = raw as PowerlineAutocompleteGetStateRequest;
-    debug?.({
-      type: "rpc:get-state:handle",
-      channel: POWERLINE_AUTOCOMPLETE_EVENTS.rpc.getState,
-      requestId: request.requestId,
-      data: raw,
-    });
-
-    replyToRpc<PowerlineAutocompleteGetStateReplyData>(
-      events,
-      POWERLINE_AUTOCOMPLETE_EVENTS.rpc.getState,
-      request.requestId,
-      () => ({ isActive: isActiveInstalledAutocomplete(request.installedId) }),
-    );
   });
 }
 
@@ -392,23 +257,23 @@ export function installPowerlineAutocompleteBridge(
     },
   );
 
-  const unsubscribePing = installPingRpcHandler(events, debug);
-  const unsubscribeRegister = installRegisterRpcHandler(events, registry, debug);
-  const unsubscribeUnregister = installUnregisterRpcHandler(events, registry, debug);
-  const unsubscribeGetState = installGetStateRpcHandler(
+  const unsubscribeRegister = installRegisterRpcHandler(
     events,
+    registry,
     (installedId) => activeInstalledIds.has(installedId),
     debug,
   );
+  const unsubscribeUnregister = installUnregisterRpcHandler(events, registry, debug);
 
+  const ready: PowerlineAutocompleteReadyData = {
+    version: POWERLINE_AUTOCOMPLETE_PROTOCOL_VERSION,
+  };
   debug?.({
     type: "ready:emit",
     channel: POWERLINE_AUTOCOMPLETE_EVENTS.ready,
-    data: { version: POWERLINE_AUTOCOMPLETE_PROTOCOL_VERSION },
+    data: ready,
   });
-  events.emit(POWERLINE_AUTOCOMPLETE_EVENTS.ready, {
-    version: POWERLINE_AUTOCOMPLETE_PROTOCOL_VERSION,
-  } satisfies PowerlineAutocompletePingReplyData);
+  events.emit(POWERLINE_AUTOCOMPLETE_EVENTS.ready, ready);
 
   return {
     isActiveInstalledAutocomplete(installedId) {
@@ -417,10 +282,8 @@ export function installPowerlineAutocompleteBridge(
     dispose() {
       unsubscribeActive();
       unsubscribeInactive();
-      unsubscribePing();
       unsubscribeRegister();
       unsubscribeUnregister();
-      unsubscribeGetState();
     },
   };
 }
@@ -433,6 +296,7 @@ export function connectPowerlineAutocompleteExtension(
   let disposed = false;
   let activeSyncGeneration = 0;
   let activeCancel: (() => void) | null = null;
+  let registrations = new Map<string, PowerlineAutocompleteRegistration>();
 
   function sync(): void {
     if (disposed) {
@@ -446,24 +310,8 @@ export function connectPowerlineAutocompleteExtension(
 
     const run = async (): Promise<void> => {
       try {
-        const pingRequest: PowerlineAutocompletePingRequest = { requestId: randomUUID() };
-        const pingCall = emitRpcCall<PowerlineAutocompletePingReplyData>(
-          events,
-          POWERLINE_AUTOCOMPLETE_EVENTS.rpc.ping,
-          pingRequest,
-          timeoutMs,
-          "rpc:ping",
-          connection.debug,
-        );
-        activeCancel = pingCall.cancel;
-        const pingReply = await pingCall.promise;
-        if (disposed || generation !== activeSyncGeneration) {
-          return;
-        }
+        const nextRegistrations = new Map<string, PowerlineAutocompleteRegistration>();
 
-        validateProtocolVersion(pingReply.version);
-
-        const installedIds: string[] = [];
         for (const enhancer of connection.enhancers) {
           const registerRequest: PowerlineAutocompleteRegisterRequest = {
             requestId: randomUUID(),
@@ -484,10 +332,17 @@ export function connectPowerlineAutocompleteExtension(
           if (disposed || generation !== activeSyncGeneration) {
             return;
           }
-          installedIds.push(reply.installedId);
+
+          nextRegistrations.set(enhancer.id, {
+            enhancerId: enhancer.id,
+            installedId: reply.installedId,
+            registrationId: reply.registrationId,
+            active: reply.active,
+          });
         }
 
-        connection.onRegistered?.(installedIds);
+        registrations = nextRegistrations;
+        connection.onRegistered?.([...registrations.values()]);
       } catch (error) {
         connection.onSyncError?.(error);
       } finally {
@@ -517,12 +372,13 @@ export function connectPowerlineAutocompleteExtension(
     activeCancel?.();
     activeCancel = null;
 
-    for (const enhancer of connection.enhancers) {
+    for (const registration of registrations.values()) {
       const unregisterRequest: PowerlineAutocompleteUnregisterRequest = {
         requestId: randomUUID(),
         protocolVersion: POWERLINE_AUTOCOMPLETE_PROTOCOL_VERSION,
         extension: connection.extension,
-        enhancerId: enhancer.id,
+        enhancerId: registration.enhancerId,
+        registrationId: registration.registrationId,
       };
       const unregisterCall = emitRpcCall<void>(
         events,
@@ -537,25 +393,4 @@ export function connectPowerlineAutocompleteExtension(
       });
     }
   };
-}
-
-export async function queryPowerlineAutocompleteState(
-  events: EventBus,
-  installedId: string,
-  timeoutMs: number = 1000,
-): Promise<boolean> {
-  const request: PowerlineAutocompleteGetStateRequest = {
-    requestId: randomUUID(),
-    installedId,
-  };
-  const call = emitRpcCall<PowerlineAutocompleteGetStateReplyData>(
-    events,
-    POWERLINE_AUTOCOMPLETE_EVENTS.rpc.getState,
-    request,
-    timeoutMs,
-    "rpc:get-state",
-    undefined,
-  );
-  const reply = await call.promise;
-  return reply.isActive;
 }
