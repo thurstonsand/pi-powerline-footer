@@ -2,22 +2,22 @@
 
 ## [Unreleased]
 
+## [0.4.11-1] - 2026-04-10
+
 ### Changed
+- Fork release metadata for publish under `@thurstonsand/pi-powerline-footer`.
+- Repository, homepage, bug tracker, and install docs now point at the `thurstonsand/pi-powerline-footer` fork.
 - Created nested `powerline` config — Settings are now organized under `powerline` as an object, including `preset`, `showLastPrompt`, `shortcuts`, and `vibe`. Legacy top-level keys are migrated into the nested object on start.
 - `custom` preset is now settings-driven via `powerline.custom` instead of using a hard-coded layout.
+- **Status copy simplified** — Removed emoji-based stash and fallback status markers from the current UI and docs.
 
 ### Added
 - Builtin segment option typing — `StatusLineSegment` now accepts a typed `options` generic, and builtin segments use their specific option shapes when rendering.
 - Custom segment loading from `~/.pi/agent/powerline/segments/` for `.js` / `.ts` files, directories with `index.js` / `index.ts`, and package-style entries declared through `pi.segments`.
 
-## [0.4.11] - 2026-04-14
-
 ### Fixed
 - **Prompt-width crash on pasted unicode text** — Replaced manual truncation in the last-prompt widget and welcome helpers with pi-tui truncation so pasted text containing grapheme clusters no longer overflows terminal width and crashes the UI.
 - **Session usage typing cleanup** — Replaced broad session assistant-message casts with local type narrowing in footer context building.
-
-### Changed
-- **Status copy simplified** — Removed emoji-based stash and fallback status markers from the current UI and docs.
 
 ## [0.4.10] - 2026-04-12
 
