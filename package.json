@@ -1,6 +1,6 @@
 {
   "name": "@thurstonsand/pi-powerline-footer",
-  "version": "0.4.11-1",
+  "version": "0.4.11-2",
   "description": "Powerline-style status bar extension for pi coding agent",
   "type": "module",
   "scripts": {

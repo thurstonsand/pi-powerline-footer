@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+## [0.4.11-2] - 2026-04-26
+
+### Fixed
+- Custom segment module resolution now mirrors pi extension loading for pi runtime packages and `typebox`, so segments can import them without local installs or symlink workarounds.
+
 ## [0.4.11-1] - 2026-04-10
 
 ### Changed
