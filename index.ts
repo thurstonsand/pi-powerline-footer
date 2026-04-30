@@ -10,7 +10,7 @@ import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync } from 
 import { join, dirname } from "node:path";
 import { homedir } from "node:os";
 
-import type { ColorScheme, SegmentContext, StatusLinePreset, StatusLineSegmentId } from "./types.js";
+import type { ColorScheme, PresetDef, SegmentContext, StatusLinePreset, StatusLineSegmentId } from "./types.js";
 import type { PowerlineConfig } from "./powerline-config.js";
 import { BashTranscriptStore } from "./bash-mode/transcript.ts";
 import {
@@ -24,8 +24,8 @@ import { BashModeEditor } from "./bash-mode/editor.ts";
 import { ManagedShellSession } from "./bash-mode/shell-session.ts";
 import { matchHistoryEntries, readGlobalShellHistory, readProjectHistory, appendProjectHistory } from "./bash-mode/history.ts";
 import type { BashModeSettings } from "./bash-mode/types.ts";
-import { getPreset, PRESETS } from "./presets.js";
-import { collectHiddenExtensionStatusKeys, getNotificationExtensionStatuses, mergeSegmentsWithCustomItems, nextPowerlineSettingWithOptions, nextPowerlineSettingWithPreset, parsePowerlineConfig } from "./powerline-config.js";
+import { PRESETS } from "./presets.js";
+import { collectHiddenExtensionStatusKeys, customPresetFromConfig, getNotificationExtensionStatuses, mergeSegmentsWithCustomItems, nextPowerlineSettingWithOptions, nextPowerlineSettingWithPreset, parsePowerlineConfig } from "./powerline-config.js";
 import { getSeparator } from "./separators.js";
 import { renderSegment } from "./segments.js";
 import { getGitStatus, invalidateGitStatus, invalidateGitBranch } from "./git-status.js";
@@ -635,10 +635,10 @@ function writePowerlineOptionSetting(
   ));
 }
 
-const PRESET_NAMES = Object.keys(PRESETS) as StatusLinePreset[];
+const PRESET_NAMES = [...Object.keys(PRESETS), "custom"] as StatusLinePreset[];
 
 function isValidPreset(value: unknown): value is StatusLinePreset {
-  return typeof value === "string" && Object.prototype.hasOwnProperty.call(PRESETS, value);
+  return typeof value === "string" && (value === "custom" || Object.prototype.hasOwnProperty.call(PRESETS, value));
 }
 
 function normalizePreset(value: unknown): StatusLinePreset | null {
@@ -862,7 +862,7 @@ function renderSegmentWithWidth(
 /** Build content string from pre-rendered parts */
 function buildContentFromParts(
   parts: string[],
-  presetDef: ReturnType<typeof getPreset>
+  presetDef: PresetDef
 ): string {
   if (parts.length === 0) return "";
   const separatorDef = getSeparator(presetDef.separator);
@@ -878,16 +878,18 @@ function buildContentFromParts(
  */
 function computeResponsiveLayout(
   ctx: SegmentContext,
-  presetDef: ReturnType<typeof getPreset>,
+  presetDef: PresetDef,
   availableWidth: number
 ): { topContent: string; secondaryContent: string } {
   const separatorDef = getSeparator(presetDef.separator);
   const sepWidth = visibleWidth(separatorDef.left) + 2; // separator + spaces around it
   
   // Get all segments: primary first, then secondary
-  const mergedSegments = mergeSegmentsWithCustomItems(presetDef, config.customItems);
-  const primaryIds = [...mergedSegments.leftSegments, ...mergedSegments.rightSegments];
-  const secondaryIds = mergedSegments.secondarySegments;
+  const segments = config.preset === "custom"
+    ? presetDef
+    : mergeSegmentsWithCustomItems(presetDef, config.customItems);
+  const primaryIds = [...segments.leftSegments, ...segments.rightSegments];
+  const secondaryIds = segments.secondarySegments ?? [];
   const allSegmentIds = [...primaryIds, ...secondaryIds];
   
   // Render all segments and get their widths
@@ -2047,7 +2049,9 @@ export default function powerlineFooter(pi: ExtensionAPI) {
   });
 
   function buildSegmentContext(ctx: any, theme: Theme): SegmentContext {
-    const presetDef = getPreset(config.preset);
+    const presetDef = config.preset === "custom"
+      ? customPresetFromConfig(config, PRESETS.default.colors)
+      : PRESETS[config.preset] ?? PRESETS.default;
     const colors: ColorScheme = presetDef.colors ?? getDefaultColors();
 
     // Build usage stats and get thinking level from session
@@ -2151,7 +2155,9 @@ export default function powerlineFooter(pi: ExtensionAPI) {
       }
     }
     
-    const presetDef = getPreset(config.preset);
+    const presetDef = config.preset === "custom"
+      ? customPresetFromConfig(config, PRESETS.default.colors)
+      : PRESETS[config.preset] ?? PRESETS.default;
     const segmentCtx = buildSegmentContext(currentCtx, theme);
     
     lastLayoutWidth = width;

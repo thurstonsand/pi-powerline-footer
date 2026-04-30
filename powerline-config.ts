@@ -1,9 +1,10 @@
 import { visibleWidth } from "@mariozechner/pi-tui";
-import type { ColorValue, CustomItemPosition, CustomStatusItem, PresetDef, StatusLinePreset, StatusLineSegmentId } from "./types.ts";
+import type { ColorScheme, ColorValue, CustomItemPosition, CustomPresetConfig, CustomStatusItem, PresetDef, StatusLinePreset, StatusLineSegmentId, StatusLineSeparatorStyle, StatusLineSegmentOptions } from "./types.ts";
 
 export interface PowerlineConfig {
   preset: StatusLinePreset;
   customItems: CustomStatusItem[];
+  custom?: CustomPresetConfig;
   mouseScroll: boolean;
   fixedEditor: boolean;
 }
@@ -40,6 +41,52 @@ function normalizeCustomPrefix(value: unknown): string | undefined {
   if (typeof value !== "string") return undefined;
   const normalized = value.trim();
   return normalized ? normalized : undefined;
+}
+
+function normalizeSegmentId(value: unknown): StatusLineSegmentId | null {
+  if (typeof value !== "string") return null;
+  const normalized = value.trim();
+  if (!normalized) return null;
+  return normalized as StatusLineSegmentId;
+}
+
+function normalizeSegmentIds(value: unknown): StatusLineSegmentId[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  return value.map(normalizeSegmentId).filter((id): id is StatusLineSegmentId => Boolean(id));
+}
+
+function normalizeSeparator(value: unknown): StatusLineSeparatorStyle | undefined {
+  switch (value) {
+    case "powerline":
+    case "powerline-thin":
+    case "slash":
+    case "pipe":
+    case "block":
+    case "none":
+    case "ascii":
+    case "dot":
+    case "chevron":
+    case "star":
+      return value;
+    default:
+      return undefined;
+  }
+}
+
+function normalizeSegmentOptions(value: unknown): StatusLineSegmentOptions | undefined {
+  return isRecord(value) ? (value as StatusLineSegmentOptions) : undefined;
+}
+
+function normalizeCustomPreset(raw: unknown): CustomPresetConfig | undefined {
+  if (!isRecord(raw)) return undefined;
+
+  return {
+    leftSegments: normalizeSegmentIds(raw.leftSegments),
+    rightSegments: normalizeSegmentIds(raw.rightSegments),
+    secondarySegments: normalizeSegmentIds(raw.secondarySegments),
+    separator: normalizeSeparator(raw.separator),
+    segmentOptions: normalizeSegmentOptions(raw.options),
+  };
 }
 
 function normalizeCustomStatusItem(raw: unknown, idOverride?: string): CustomStatusItem | null {
@@ -94,8 +141,20 @@ export function parsePowerlineConfig(value: unknown, presets: readonly StatusLin
   return {
     preset: normalizePreset(value.preset, presets) ?? defaultConfig.preset,
     customItems: normalizeCustomItems(value.customItems),
+    custom: normalizeCustomPreset(value.custom),
     mouseScroll: value.mouseScroll !== false,
     fixedEditor: value.fixedEditor !== false,
+  };
+}
+
+export function customPresetFromConfig(config: PowerlineConfig, colors?: ColorScheme): PresetDef {
+  return {
+    leftSegments: config.custom?.leftSegments ?? [],
+    rightSegments: config.custom?.rightSegments ?? [],
+    secondarySegments: config.custom?.secondarySegments ?? [],
+    separator: config.custom?.separator ?? "powerline-thin",
+    segmentOptions: config.custom?.segmentOptions ?? {},
+    colors,
   };
 }
 
