@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+### Added
+- **Configurable custom preset layout** — `powerline.preset: "custom"` can define explicit segment rows and separator style through `powerline.custom`, including `custom:<id>` entries for promoted extension statuses.
+
 ## [0.6.1] - 2026-06-08
 
 ### Fixed
