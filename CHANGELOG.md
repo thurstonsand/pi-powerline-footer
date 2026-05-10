@@ -2,8 +2,9 @@
 
 ## [Unreleased]
 
+## [0.6.1-2] - 2026-07-13
+
 ### Added
-- **Configurable custom preset layout** — `powerline.preset: "custom"` can define explicit segment rows and separator style through `powerline.custom`, including `custom:<id>` entries for promoted extension statuses.
 - **Fixed-editor scroll-away shortcut hint card** — Shows a stacked bottom/user/assistant shortcut card when chat is scrolled away from the bottom; clicking anywhere in the card jumps back to the bottom when fixed-editor mouse handling is enabled.
 - **Welcome toggle** — Added `powerline.welcome` so the startup welcome UI can be disabled without disabling the footer. Thanks to OCPdev25, miloslavnosek, vzeazy, and Florian Kinder (@fank) for #48/#89.
 - **Display options** — Added `powerline.cost.subscriptionDisplay` and `powerline.model.display` for subscription cost and provider-qualified model names. Thanks to Alexandr Burdiyan (@burdiyan), Meidhy (@dymayday), Mathu Mounasamy (@Mathuv), and pserey for #3/#83/#50.
@@ -12,6 +13,7 @@
 - **Agent-dir path support** — Respects `PI_CODING_AGENT_DIR` for global powerline settings, stash history, sessions, vibes, skills, commands, and extension discovery. Thanks to Hrand Liu (@IstPlayer) for #86.
 
 ### Changed
+- **Fork base refresh** — Includes upstream changes since pi-powerline-footer v0.6.1 while retaining configurable custom preset layouts.
 - **Herdr and tmux scroll guidance** — Keeps fixed-editor mouse scrolling enabled by default and documents that host multiplexer scrollback needs `/powerline fixed-editor off`.
 - **Bottom jump shortcut** — Uses `ctrl+alt+g` as the default fixed-editor jump-to-bottom shortcut instead of `ctrl+shift+g`.
 - **Stash shortcut safety** — Literal `ß` is no longer consumed as stash by default; unambiguous Alt/Meta-S escape encodings still work.
@@ -29,6 +31,15 @@
 - **Context icon glyph** — Switched the Nerd Font context icon to a stable v3-friendly database glyph. Thanks to Michael Leonard (@LeonardMH) for #41.
 - **Recent session names** — Recent-session project names now prefer the session JSONL header `cwd` basename before falling back to encoded directory names. Thanks to Jon Leemon (@nomeelnoj) for #76.
 - **Quit cursor restore** — When fixed-editor mode is off, quitting now moves the terminal cursor below Pi's inline editor area without running on `/reload` or session switches. Thanks to afkdev8 (@mrinfinidy) for #60.
+
+## [0.6.1-1] - 2026-06-17
+
+### Added
+- **Configurable custom preset layout** — `powerline.preset: "custom"` can define explicit segment rows and separator style through `powerline.custom`, including `custom:<id>` entries for promoted extension statuses.
+
+### Changed
+- Fork release metadata and install docs now publish under `@thurstonsand/pi-powerline-footer`.
+- Release-only package metadata targets Pi's current package scope and this repo skill documents the rebase/publish/tag process.
 
 ## [0.6.1] - 2026-06-08
 
