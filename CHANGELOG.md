@@ -2,8 +2,14 @@
 
 ## [Unreleased]
 
+## [0.5.1-1] - 2026-05-09
+
 ### Added
 - **Configurable custom preset layout** — `powerline.preset: "custom"` can now define explicit segment rows, separator style, and per-segment options through `powerline.custom`, including `custom:<id>` entries for promoted extension statuses.
+
+### Changed
+- Fork release metadata and install docs now publish under `@thurstonsand/pi-powerline-footer`.
+- Release-only package metadata now targets Pi's `@earendil-works/*` package scope and documents the npm publish checklist in `RELEASE.md`.
 
 ## [0.5.1] - 2026-05-02
 

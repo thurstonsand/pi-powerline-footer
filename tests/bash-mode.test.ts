@@ -24,28 +24,30 @@ function getMethod(target: object, name: string): Function {
 }
 
 function ensureEditorModuleLinks(): { cleanup: () => void } {
-  const nodeModulesDir = join(process.cwd(), "node_modules", "@mariozechner");
+  const nodeModulesDir = join(process.cwd(), "node_modules", "@earendil-works");
   mkdirSync(nodeModulesDir, { recursive: true });
   const links = [
     {
       link: join(nodeModulesDir, "pi-coding-agent"),
-      target: "/opt/homebrew/lib/node_modules/@mariozechner/pi-coding-agent",
+      target: "/opt/homebrew/lib/node_modules/@earendil-works/pi-coding-agent",
     },
     {
       link: join(nodeModulesDir, "pi-tui"),
-      target: "/opt/homebrew/lib/node_modules/@mariozechner/pi-coding-agent/node_modules/@mariozechner/pi-tui",
+      target: "/opt/homebrew/lib/node_modules/@earendil-works/pi-coding-agent/node_modules/@earendil-works/pi-tui",
     },
   ];
 
+  const created: string[] = [];
   for (const { link, target } of links) {
     if (!existsSync(link)) {
       symlinkSync(target, link);
+      created.push(link);
     }
   }
 
   return {
     cleanup() {
-      for (const { link } of links.reverse()) {
+      for (const link of created.reverse()) {
         if (existsSync(link)) {
           rmSync(link, { recursive: true, force: true });
         }
@@ -557,7 +559,7 @@ test("bash editor does not submit pasted multiline input while bracketed paste i
 
   try {
     const { BashModeEditor } = await import("../bash-mode/editor.ts");
-    const { CustomEditor } = await import("/opt/homebrew/lib/node_modules/@mariozechner/pi-coding-agent/dist/modes/interactive/components/custom-editor.js");
+    const { CustomEditor } = await import(join(process.cwd(), "node_modules", "@earendil-works", "pi-coding-agent", "dist", "modes", "interactive", "components", "custom-editor.js"));
 
     let delegated = 0;
     let submitted = 0;
@@ -605,7 +607,7 @@ test("bash editor refreshes shell ghost state after a bracketed paste completes"
 
   try {
     const { BashModeEditor } = await import("../bash-mode/editor.ts");
-    const { CustomEditor } = await import("/opt/homebrew/lib/node_modules/@mariozechner/pi-coding-agent/dist/modes/interactive/components/custom-editor.js");
+    const { CustomEditor } = await import(join(process.cwd(), "node_modules", "@earendil-works", "pi-coding-agent", "dist", "modes", "interactive", "components", "custom-editor.js"));
 
     let delegated = 0;
     let scheduled = 0;
@@ -926,8 +928,8 @@ test("bash editor runs copied Pi app action handlers for alt-enter", async () =>
 
   try {
     const { BashModeEditor } = await import("../bash-mode/editor.ts");
-    const { KeybindingsManager } = await import("/opt/homebrew/lib/node_modules/@mariozechner/pi-coding-agent/dist/core/keybindings.js");
-    const { setKittyProtocolActive } = await import("/opt/homebrew/lib/node_modules/@mariozechner/pi-coding-agent/node_modules/@mariozechner/pi-tui/dist/keys.js");
+    const { KeybindingsManager } = await import(join(process.cwd(), "node_modules", "@earendil-works", "pi-coding-agent", "dist", "core", "keybindings.js"));
+    const { setKittyProtocolActive } = await import(join(process.cwd(), "node_modules", "@earendil-works", "pi-tui", "dist", "keys.js"));
     const keybindings = KeybindingsManager.create();
     const editor = new BashModeEditor(
       { requestRender() {}, terminal: { columns: 80, rows: 24 } },
@@ -972,7 +974,7 @@ test("bash editor command arrows jump to editor boundaries", async () => {
 
   try {
     const { BashModeEditor } = await import("../bash-mode/editor.ts");
-    const { KeybindingsManager } = await import("/opt/homebrew/lib/node_modules/@mariozechner/pi-coding-agent/dist/core/keybindings.js");
+    const { KeybindingsManager } = await import(join(process.cwd(), "node_modules", "@earendil-works", "pi-coding-agent", "dist", "core", "keybindings.js"));
     const keybindings = KeybindingsManager.create();
     let renderRequests = 0;
     const editor = new BashModeEditor(
@@ -1170,7 +1172,7 @@ test("one-off bang submit does not accept ghost text before submitting", async (
 
   try {
     const { BashModeEditor } = await import("../bash-mode/editor.ts");
-    const { CustomEditor } = await import("/opt/homebrew/lib/node_modules/@mariozechner/pi-coding-agent/dist/modes/interactive/components/custom-editor.js");
+    const { CustomEditor } = await import(join(process.cwd(), "node_modules", "@earendil-works", "pi-coding-agent", "dist", "modes", "interactive", "components", "custom-editor.js"));
 
     let delegated = 0;
     const superHandleInput = CustomEditor.prototype.handleInput;

@@ -1,12 +1,14 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { KEYBINDINGS } from "/opt/homebrew/lib/node_modules/@mariozechner/pi-coding-agent/dist/core/keybindings.js";
+import { join } from "node:path";
 import {
   isSupportedSuperShortcut,
   matchesConfiguredShortcut,
   shortcutConflictKey,
 } from "../shortcuts.ts";
+
+const { KEYBINDINGS } = await import(join(process.cwd(), "node_modules", "@earendil-works", "pi-coding-agent", "dist", "core", "keybindings.js"));
 
 const source = readFileSync(new URL("../index.ts", import.meta.url), "utf-8");
 
